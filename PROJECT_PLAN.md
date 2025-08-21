@@ -9,11 +9,11 @@ Complete development plan for YTAudioBar - a macOS menu bar app for YouTube audi
 - [x] Set up Core Data model for favorites, playlists, and settings
 - [x] Create base app structure with menu bar integration
 
-## Phase 2: Core UI Development
-- [ ] Implement menu bar icon and dropdown UI
-- [ ] Create SwiftUI views for search interface
-- [ ] Build settings UI and preferences management
-- [ ] Create mini player (optional floating window)
+## Phase 2: Core UI Development ✅ COMPLETED
+- [x] Implement menu bar icon and dropdown UI
+- [x] Create SwiftUI views for search interface
+- [x] Build settings UI and preferences management
+- [x] Create mini player (optional floating window)
 
 ## Phase 3: YouTube Integration
 - [ ] Implement yt-dlp binary integration and command execution
@@ -55,4 +55,4 @@ Complete development plan for YTAudioBar - a macOS menu bar app for YouTube audi
 ## Task Status
 ✅ = Completed | 🔄 = In Progress | ⏳ = Pending
 
-Current Status: Phase 1 Complete - Phase 2 in progress
+Current Status: Phase 2 Complete - Phase 3 ready to start
