@@ -12,58 +12,76 @@ struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
 
     @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
+        sortDescriptors: [NSSortDescriptor(keyPath: \Track.addedDate, ascending: true)],
         animation: .default)
-    private var items: FetchedResults<Item>
+    private var tracks: FetchedResults<Track>
 
     var body: some View {
         NavigationView {
             List {
-                ForEach(items) { item in
+                ForEach(tracks) { track in
                     NavigationLink {
-                        Text("Item at \(item.timestamp!, formatter: itemFormatter)")
+                        VStack(alignment: .leading) {
+                            Text(track.title ?? "Unknown Title")
+                                .font(.headline)
+                            Text(track.author ?? "Unknown Author")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Text("Added: \(track.addedDate ?? Date(), formatter: itemFormatter)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
                     } label: {
-                        Text(item.timestamp!, formatter: itemFormatter)
+                        VStack(alignment: .leading) {
+                            Text(track.title ?? "Unknown Title")
+                                .font(.headline)
+                            Text(track.author ?? "Unknown Author")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
-                .onDelete(perform: deleteItems)
+                .onDelete(perform: deleteTracks)
             }
             .toolbar {
                 ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                    Button(action: addSampleTrack) {
+                        Label("Add Sample Track", systemImage: "plus")
                     }
                 }
             }
-            Text("Select an item")
+            Text("Select a track")
         }
     }
 
-    private func addItem() {
+    private func addSampleTrack() {
         withAnimation {
-            let newItem = Item(context: viewContext)
-            newItem.timestamp = Date()
+            let newTrack = Track(context: viewContext)
+            newTrack.id = UUID().uuidString
+            newTrack.title = "Sample Track \(Date().timeIntervalSince1970)"
+            newTrack.author = "Sample Author"
+            newTrack.duration = Int32.random(in: 120...300)
+            newTrack.addedDate = Date()
+            newTrack.isFavorite = false
+            newTrack.isDownloaded = false
 
             do {
                 try viewContext.save()
             } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
                 let nsError = error as NSError
                 fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
             }
         }
     }
 
-    private func deleteItems(offsets: IndexSet) {
+    private func deleteTracks(offsets: IndexSet) {
         withAnimation {
-            offsets.map { items[$0] }.forEach(viewContext.delete)
+            offsets.map { tracks[$0] }.forEach(viewContext.delete)
 
             do {
                 try viewContext.save()
             } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
                 let nsError = error as NSError
                 fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
             }

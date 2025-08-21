@@ -1,9 +1,36 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="1" systemVersion="11A491" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithCloudKit="false" userDefinedModelVersionIdentifier="">
-    <entity name="Item" representedClassName="Item" syncable="YES" codeGenerationType="class">
-        <attribute name="timestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+    <entity name="Track" representedClassName="Track" syncable="YES" codeGenerationType="class">
+        <attribute name="id" attributeType="String"/>
+        <attribute name="title" attributeType="String"/>
+        <attribute name="author" attributeType="String"/>
+        <attribute name="duration" attributeType="Integer 32" usesScalarValueType="YES"/>
+        <attribute name="thumbnailURL" optional="YES" attributeType="String"/>
+        <attribute name="audioURL" optional="YES" attributeType="String"/>
+        <attribute name="addedDate" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="isFavorite" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="isDownloaded" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="localPath" optional="YES" attributeType="String"/>
+        <relationship name="playlist" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Playlist" inverseName="tracks" inverseEntity="Playlist"/>
+    </entity>
+    <entity name="Playlist" representedClassName="Playlist" syncable="YES" codeGenerationType="class">
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String"/>
+        <attribute name="createdDate" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="isSystemPlaylist" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <relationship name="tracks" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Track" inverseName="playlist" inverseEntity="Track"/>
+    </entity>
+    <entity name="AppSettings" representedClassName="AppSettings" syncable="YES" codeGenerationType="class">
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="defaultDownloadPath" attributeType="String"/>
+        <attribute name="preferredAudioQuality" attributeType="String" defaultValueString="best"/>
+        <attribute name="autoUpdateYTDLP" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="showMiniPlayer" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="darkMode" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
     </entity>
     <elements>
-        <element name="Item" positionX="-63" positionY="-18" width="128" height="44"/>
+        <element name="Track" positionX="-63" positionY="-18" width="128" height="209"/>
+        <element name="Playlist" positionX="144" positionY="-18" width="128" height="104"/>
+        <element name="AppSettings" positionX="-63" positionY="225" width="128" height="119"/>
     </elements>
 </model>
