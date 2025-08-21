@@ -9,11 +9,7 @@ import SwiftUI
 import CoreData
 
 struct MiniPlayerView: View {
-    @Binding var currentTrack: Track?
-    @Binding var isPlaying: Bool
-    @State private var currentPosition: Double = 0
-    @State private var duration: Double = 0
-    @State private var volume: Double = 0.7
+    @ObservedObject var audioManager: AudioManager
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
@@ -39,7 +35,7 @@ struct MiniPlayerView: View {
             .padding(.vertical, 16)
             .background(Color(.controlBackgroundColor))
             
-            if let track = currentTrack {
+            if let track = audioManager.currentTrack {
                 VStack(spacing: 20) {
                     // Album art placeholder and track info
                     VStack(spacing: 16) {
@@ -53,13 +49,13 @@ struct MiniPlayerView: View {
                             )
                         
                         VStack(spacing: 6) {
-                            Text(track.title ?? "Unknown Track")
+                            Text(track.title)
                                 .font(.headline)
                                 .fontWeight(.semibold)
                                 .lineLimit(2)
                                 .multilineTextAlignment(.center)
                             
-                            Text(track.author ?? "Unknown Artist")
+                            Text(track.uploader)
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                                 .lineLimit(1)
@@ -68,21 +64,24 @@ struct MiniPlayerView: View {
                     
                     // Progress bar
                     VStack(spacing: 8) {
-                        Slider(value: $currentPosition, in: 0...duration) { editing in
+                        Slider(value: Binding(
+                            get: { audioManager.currentPosition },
+                            set: { _ in }
+                        ), in: 0...max(1, audioManager.duration)) { editing in
                             if !editing {
-                                // TODO: Seek to position
+                                // TODO: Implement seeking
                             }
                         }
-                        .disabled(duration == 0)
+                        .disabled(audioManager.duration == 0)
                         
                         HStack {
-                            Text(formatTime(currentPosition))
+                            Text(formatTime(audioManager.currentPosition))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
                             Spacer()
                             
-                            Text(formatTime(duration))
+                            Text(formatTime(audioManager.duration))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -100,10 +99,9 @@ struct MiniPlayerView: View {
                         .buttonStyle(.plain)
                         
                         Button(action: {
-                            isPlaying.toggle()
-                            // TODO: Implement actual play/pause
+                            audioManager.togglePlayPause()
                         }) {
-                            Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                            Image(systemName: audioManager.isPlaying ? "pause.circle.fill" : "play.circle.fill")
                                 .font(.system(size: 44))
                                 .foregroundColor(.accentColor)
                         }
@@ -121,16 +119,19 @@ struct MiniPlayerView: View {
                     
                     // Volume control
                     HStack(spacing: 12) {
-                        Image(systemName: volume == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                        Image(systemName: audioManager.volume == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill")
                             .font(.system(size: 14))
                             .foregroundColor(.secondary)
                             .frame(width: 20)
                         
-                        Slider(value: $volume, in: 0...1) { _ in
-                            // TODO: Update volume
+                        Slider(value: Binding(
+                            get: { Double(audioManager.volume) },
+                            set: { audioManager.setVolume(Float($0)) }
+                        ), in: 0...1) { _ in
+                            // Volume is updated in real-time through the binding
                         }
                         
-                        Text("\(Int(volume * 100))%")
+                        Text("\(Int(audioManager.volume * 100))%")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .frame(width: 35, alignment: .trailing)
@@ -141,8 +142,8 @@ struct MiniPlayerView: View {
                         Button(action: {
                             // TODO: Toggle favorite
                         }) {
-                            Image(systemName: (track.isFavorite ? "heart.fill" : "heart"))
-                                .foregroundColor(track.isFavorite ? .red : .secondary)
+                            Image(systemName: "heart")
+                                .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)
                         
@@ -157,8 +158,8 @@ struct MiniPlayerView: View {
                         Button(action: {
                             // TODO: Download track
                         }) {
-                            Image(systemName: track.isDownloaded ? "arrow.down.circle.fill" : "arrow.down.circle")
-                                .foregroundColor(track.isDownloaded ? .green : .secondary)
+                            Image(systemName: "arrow.down.circle")
+                                .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)
                         
@@ -193,10 +194,6 @@ struct MiniPlayerView: View {
         }
         .frame(width: 320, height: 480)
         .background(Color(.windowBackgroundColor))
-        .onAppear {
-            // TODO: Load current track duration
-            duration = Double(currentTrack?.duration ?? 0)
-        }
     }
     
     private func formatTime(_ seconds: Double) -> String {
@@ -229,19 +226,16 @@ class MiniPlayerWindowController: NSWindowController {
         
         // Set up the SwiftUI content
         let hostingController = NSHostingController(rootView: 
-            MiniPlayerView(currentTrack: .constant(nil), isPlaying: .constant(false))
+            MiniPlayerView(audioManager: AudioManager.shared)
                 .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
         )
         
         window.contentViewController = hostingController
     }
     
-    func updateTrack(_ track: Track?, isPlaying: Bool) {
-        let newView = MiniPlayerView(
-            currentTrack: .constant(track),
-            isPlaying: .constant(isPlaying)
-        )
-        .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+    func updateTrack(_ audioManager: AudioManager) {
+        let newView = MiniPlayerView(audioManager: audioManager)
+            .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
         
         let newHostingController = NSHostingController(rootView: newView)
         window?.contentViewController = newHostingController
@@ -249,6 +243,6 @@ class MiniPlayerWindowController: NSWindowController {
 }
 
 #Preview {
-    MiniPlayerView(currentTrack: .constant(nil), isPlaying: .constant(false))
+    MiniPlayerView(audioManager: AudioManager.shared)
         .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
 }

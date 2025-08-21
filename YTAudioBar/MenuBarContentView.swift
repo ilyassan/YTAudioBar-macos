@@ -10,9 +10,9 @@ import CoreData
 
 struct MenuBarContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @StateObject private var audioManager = AudioManager.shared
     @State private var searchText = ""
     @State private var currentTrack: Track?
-    @State private var isPlaying = false
     @State private var selectedTab = 0
     @State private var isSearching = false
     @State private var isMusicMode = false
@@ -22,9 +22,9 @@ struct MenuBarContentView: View {
             // Header with search bar
             HeaderView(searchText: $searchText, isSearching: $isSearching, isMusicMode: $isMusicMode)
             
-            // Current track display
-            if let track = currentTrack {
-                CurrentTrackView(track: track, isPlaying: $isPlaying)
+            // Current track display - show immediately when track is set, even if loading
+            if let currentYTTrack = audioManager.currentTrack {
+                CurrentTrackView(track: nil, ytTrack: currentYTTrack, audioManager: audioManager)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(Color(.controlBackgroundColor))
@@ -38,21 +38,21 @@ struct MenuBarContentView: View {
             
             // Main content area
             TabView(selection: $selectedTab) {
-                SearchResultsView(searchText: searchText, currentTrack: $currentTrack, isSearching: $isSearching, isMusicMode: isMusicMode)
+                SearchResultsView(searchText: searchText, currentTrack: $currentTrack, isSearching: $isSearching, isMusicMode: isMusicMode, audioManager: audioManager)
                     .tabItem {
                         Image(systemName: "magnifyingglass")
                         Text("Search")
                     }
                     .tag(0)
                 
-                QueueView(currentTrack: $currentTrack, isPlaying: $isPlaying)
+                QueueView(currentTrack: $currentTrack, audioManager: audioManager)
                     .tabItem {
                         Image(systemName: "list.bullet")
                         Text("Queue")
                     }
                     .tag(1)
                 
-                FavoritesView(currentTrack: $currentTrack)
+                FavoritesView(currentTrack: $currentTrack, audioManager: audioManager)
                     .tabItem {
                         Image(systemName: "heart.fill")
                         Text("Favorites")
@@ -163,39 +163,140 @@ struct HeaderView: View {
 }
 
 struct CurrentTrackView: View {
-    let track: Track
-    @Binding var isPlaying: Bool
+    let track: Track?
+    let ytTrack: YTVideoInfo?
+    @ObservedObject var audioManager: AudioManager
+    @State private var isSeekingManually = false
+    @State private var seekPosition: Double = 0
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(track.title ?? "Unknown")
-                    .font(.headline)
-                    .lineLimit(1)
+        VStack(spacing: 8) {
+            // Track info and basic controls
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ytTrack?.title ?? track?.title ?? "Unknown")
+                        .font(.headline)
+                        .lineLimit(1)
+                    
+                    Text(ytTrack?.uploader ?? track?.author ?? "Unknown Artist")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
                 
-                Text(track.author ?? "Unknown Artist")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
+                Spacer()
+                
+                if audioManager.isLoading {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .frame(width: 20, height: 20)
+                }
+                
+                HStack(spacing: 12) {
+                    Button(action: {
+                        // TODO: Previous track
+                    }) {
+                        Image(systemName: "backward.fill")
+                    }
+                    .disabled(true)
+                    
+                    Button(action: {
+                        audioManager.togglePlayPause()
+                    }) {
+                        Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
+                    }
+                    .disabled(audioManager.currentTrack == nil)
+                    
+                    Button(action: {
+                        // TODO: Next track
+                    }) {
+                        Image(systemName: "forward.fill")
+                    }
+                    .disabled(true)
+                }
+                .foregroundColor(.primary)
             }
             
-            Spacer()
-            
-            HStack(spacing: 12) {
-                Button(action: {}) {
-                    Image(systemName: "backward.fill")
+            // Progress bar with seek functionality - show even during loading
+            if audioManager.currentTrack != nil {
+                VStack(spacing: 4) {
+                    if audioManager.isLoading {
+                        // Show indeterminate progress during loading
+                        ProgressView()
+                            .scaleEffect(0.8)
+                            .frame(height: 20)
+                    } else {
+                        Slider(
+                            value: Binding(
+                                get: { isSeekingManually ? seekPosition : audioManager.currentPosition },
+                                set: { seekPosition = $0 }
+                            ),
+                            in: 0...max(1, audioManager.duration)
+                        ) { editing in
+                            if editing {
+                                isSeekingManually = true
+                            } else {
+                                isSeekingManually = false
+                                audioManager.seek(to: seekPosition)
+                            }
+                        }
+                        .disabled(audioManager.duration == 0)
+                    }
+                    
+                    HStack {
+                        Text(audioManager.isLoading ? "--:--" : formatTime(audioManager.currentPosition))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                        
+                        // Playback speed control - disable during loading
+                        HStack(spacing: 4) {
+                            Button(action: {
+                                let newRate = max(0.25, audioManager.playbackRate - 0.25)
+                                audioManager.setPlaybackRate(newRate)
+                            }) {
+                                Image(systemName: "minus.circle.fill")
+                                    .font(.caption)
+                                    .foregroundColor(audioManager.isLoading ? .secondary.opacity(0.5) : .secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(audioManager.isLoading)
+                            
+                            Text("\(String(format: "%.2fx", audioManager.playbackRate))")
+                                .font(.caption2)
+                                .foregroundColor(audioManager.isLoading ? .secondary.opacity(0.5) : .secondary)
+                                .frame(width: 40, alignment: .center)
+                            
+                            Button(action: {
+                                let newRate = min(2.0, audioManager.playbackRate + 0.25)
+                                audioManager.setPlaybackRate(newRate)
+                            }) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.caption)
+                                    .foregroundColor(audioManager.isLoading ? .secondary.opacity(0.5) : .secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(audioManager.isLoading)
+                        }
+                        
+                        Spacer()
+                        
+                        Text(audioManager.isLoading ? "--:--" : formatTime(audioManager.duration))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
-                
-                Button(action: { isPlaying.toggle() }) {
-                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                }
-                
-                Button(action: {}) {
-                    Image(systemName: "forward.fill")
-                }
+                .padding(.horizontal, 4)
             }
-            .foregroundColor(.primary)
         }
+    }
+    
+    private func formatTime(_ seconds: Double) -> String {
+        let totalSeconds = Int(seconds)
+        let minutes = totalSeconds / 60
+        let remainingSeconds = totalSeconds % 60
+        return String(format: "%d:%02d", minutes, remainingSeconds)
     }
 }
 
@@ -205,6 +306,7 @@ struct SearchResultsView: View {
     @Binding var currentTrack: Track?
     @Binding var isSearching: Bool
     let isMusicMode: Bool
+    @ObservedObject var audioManager: AudioManager
     @State private var searchResults: [YTVideoInfo] = []
     @State private var errorMessage: String?
     @State private var searchTask: Task<Void, Never>?
@@ -222,7 +324,7 @@ struct SearchResultsView: View {
                         retrySearch()
                     }
                 } else {
-                    SearchResultsList(results: searchResults, currentTrack: $currentTrack)
+                    SearchResultsList(results: searchResults, currentTrack: $currentTrack, audioManager: audioManager)
                 }
             }
         }
@@ -392,6 +494,7 @@ struct ErrorSearchView: View {
 struct SearchResultsList: View {
     let results: [YTVideoInfo]
     @Binding var currentTrack: Track?
+    @ObservedObject var audioManager: AudioManager
     @Environment(\.managedObjectContext) private var viewContext
     
     var body: some View {
@@ -413,7 +516,7 @@ struct SearchResultsList: View {
             .padding()
         } else {
             List(results, id: \.id) { result in
-                SearchResultRow(result: result, currentTrack: $currentTrack)
+                SearchResultRow(result: result, currentTrack: $currentTrack, audioManager: audioManager)
             }
             .listStyle(.plain)
         }
@@ -423,6 +526,7 @@ struct SearchResultsList: View {
 struct SearchResultRow: View {
     let result: YTVideoInfo
     @Binding var currentTrack: Track?
+    @ObservedObject var audioManager: AudioManager
     @Environment(\.managedObjectContext) private var viewContext
     @State private var isFavorite = false
     @State private var isAnimating = false
@@ -459,7 +563,7 @@ struct SearchResultRow: View {
                         )
                 }
             }
-            .frame(width: 48, height: 48)
+            .frame(width: 64, height: 36)
             .clipShape(RoundedRectangle(cornerRadius: 6))
             
             VStack(alignment: .leading, spacing: 4) {
@@ -481,11 +585,25 @@ struct SearchResultRow: View {
             
             HStack(spacing: 8) {
                 Button(action: {
-                    playTrack(result)
+                    if audioManager.currentTrack?.id == result.id && audioManager.isPlaying {
+                        audioManager.togglePlayPause()
+                    } else {
+                        playTrack(result)
+                    }
                 }) {
-                    Image(systemName: "play.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.accentColor)
+                    Group {
+                        if audioManager.currentTrack?.id == result.id && audioManager.isLoading {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else if audioManager.currentTrack?.id == result.id && audioManager.isPlaying {
+                            Image(systemName: "pause.circle.fill")
+                        } else {
+                            Image(systemName: "play.circle.fill")
+                        }
+                    }
+                    .font(.title2)
+                    .foregroundColor(.accentColor)
+                    .frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain)
                 
@@ -534,26 +652,37 @@ struct SearchResultRow: View {
     }
     
     private func playTrack(_ videoInfo: YTVideoInfo) {
-        // Create or update track in Core Data
-        let track = Track(context: viewContext)
-        track.id = videoInfo.id
-        track.title = videoInfo.title
-        track.author = videoInfo.uploader
-        track.duration = Int32(videoInfo.duration)
-        track.thumbnailURL = videoInfo.thumbnailURL
-        track.addedDate = Date()
-        track.isFavorite = false
-        track.isDownloaded = false
+        // Show loading immediately for instant feedback
+        audioManager.currentTrack = videoInfo
+        audioManager.isLoading = true
+        audioManager.isPlaying = false
         
-        do {
-            try viewContext.save()
-            currentTrack = track
+        // Perform Core Data operations on main queue
+        DispatchQueue.main.async {
+            // Create or update track in Core Data
+            let track = Track(context: viewContext)
+            track.id = videoInfo.id
+            track.title = videoInfo.title
+            track.author = videoInfo.uploader
+            track.duration = Int32(videoInfo.duration)
+            track.thumbnailURL = videoInfo.thumbnailURL
+            track.addedDate = Date()
+            track.isFavorite = false
+            track.isDownloaded = false
             
-            // TODO: Audio streaming will be implemented in Phase 4
-            print("▶️ Track set as current: \(videoInfo.title)")
-            print("🔄 Audio streaming not yet implemented - Phase 4")
-        } catch {
-            print("Failed to save track: \(error)")
+            do {
+                try viewContext.save()
+                currentTrack = track
+                
+                // Start audio playback using AudioManager
+                Task { @MainActor in
+                    await audioManager.play(track: videoInfo)
+                }
+                
+                print("▶️ Playing: \(videoInfo.title)")
+            } catch {
+                print("Failed to save track: \(error)")
+            }
         }
     }
     
@@ -619,7 +748,7 @@ struct SearchResultRow: View {
 
 struct QueueView: View {
     @Binding var currentTrack: Track?
-    @Binding var isPlaying: Bool
+    @ObservedObject var audioManager: AudioManager
     
     var body: some View {
         VStack(spacing: 20) {
@@ -645,6 +774,7 @@ struct QueueView: View {
 
 struct FavoritesView: View {
     @Binding var currentTrack: Track?
+    @ObservedObject var audioManager: AudioManager
     @Environment(\.managedObjectContext) private var viewContext
     
     @FetchRequest(
@@ -676,7 +806,7 @@ struct FavoritesView: View {
                 .padding()
             } else {
                 List(favoritesTracks, id: \.objectID) { track in
-                    FavoriteTrackRow(track: track, currentTrack: $currentTrack)
+                    FavoriteTrackRow(track: track, currentTrack: $currentTrack, audioManager: audioManager)
                 }
                 .listStyle(.plain)
             }
@@ -687,43 +817,150 @@ struct FavoritesView: View {
 struct FavoriteTrackRow: View {
     let track: Track
     @Binding var currentTrack: Track?
+    @ObservedObject var audioManager: AudioManager
+    @Environment(\.managedObjectContext) private var viewContext
     
     var body: some View {
         HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.secondary.opacity(0.3))
-                .frame(width: 40, height: 40)
-                .overlay(
-                    Image(systemName: "music.note")
-                        .foregroundColor(.secondary)
-                        .font(.system(size: 14))
-                )
+            // Thumbnail with rectangle aspect ratio
+            AsyncImage(url: getThumbnailURL(from: track.thumbnailURL)) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                case .failure(_):
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.secondary.opacity(0.3))
+                        .overlay(
+                            Image(systemName: "photo")
+                                .foregroundColor(.secondary)
+                                .font(.system(size: 12))
+                        )
+                case .empty:
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.secondary.opacity(0.3))
+                        .overlay(
+                            ProgressView()
+                                .scaleEffect(0.5)
+                        )
+                @unknown default:
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.secondary.opacity(0.3))
+                        .overlay(
+                            Image(systemName: "music.note")
+                                .foregroundColor(.secondary)
+                                .font(.system(size: 12))
+                        )
+                }
+            }
+            .frame(width: 56, height: 32)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.title ?? "Unknown")
                     .font(.headline)
                     .lineLimit(1)
                 
-                Text(track.author ?? "Unknown Artist")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
+                HStack {
+                    Text(track.author ?? "Unknown Artist")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                    
+                    Spacer()
+                    
+                    Text(formatDuration(Int(track.duration)))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             
             Spacer()
             
-            Button(action: {
-                currentTrack = track
-            }) {
-                Image(systemName: "play.circle.fill")
+            HStack(spacing: 8) {
+                Button(action: {
+                    // Create YTVideoInfo from Track for playback
+                    let videoInfo = YTVideoInfo(
+                        id: track.id ?? "",
+                        title: track.title ?? "Unknown",
+                        uploader: track.author ?? "Unknown Artist",
+                        duration: Int(track.duration),
+                        thumbnailURL: track.thumbnailURL,
+                        audioURL: nil,
+                        description: nil
+                    )
+                    
+                    currentTrack = track
+                    Task { @MainActor in
+                        await audioManager.play(track: videoInfo)
+                    }
+                }) {
+                    Group {
+                        if audioManager.currentTrack?.id == track.id && audioManager.isLoading {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else if audioManager.currentTrack?.id == track.id && audioManager.isPlaying {
+                            Image(systemName: "pause.circle.fill")
+                        } else {
+                            Image(systemName: "play.circle.fill")
+                        }
+                    }
                     .font(.title3)
                     .foregroundColor(.accentColor)
+                    .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                
+                Button(action: {
+                    removeFavorite(track)
+                }) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 14))
+                        .foregroundColor(.red)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(.vertical, 6)
     }
+    
+    private func getThumbnailURL(from thumbnailString: String?) -> URL? {
+        guard let thumbnailString = thumbnailString,
+              !thumbnailString.isEmpty else {
+            // Fallback to constructed URL if we have the video ID
+            return URL(string: "https://i.ytimg.com/vi/\(track.id ?? "")/hqdefault.jpg")
+        }
+        
+        // Clean the URL string and create URL
+        let cleanedString = thumbnailString.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = URL(string: cleanedString), 
+           url.scheme != nil {
+            return url
+        }
+        
+        // Fallback to constructed URL
+        return URL(string: "https://i.ytimg.com/vi/\(track.id ?? "")/hqdefault.jpg")
+    }
+    
+    private func formatDuration(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let remainingSeconds = seconds % 60
+        return String(format: "%d:%02d", minutes, remainingSeconds)
+    }
+    
+    private func removeFavorite(_ track: Track) {
+        // Remove from favorites but don't delete the track completely
+        track.isFavorite = false
+        
+        do {
+            try viewContext.save()
+        } catch {
+            print("Failed to remove favorite: \(error)")
+        }
+    }
 }
+
 
 
 struct SettingsView: View {
