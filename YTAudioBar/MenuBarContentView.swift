@@ -15,11 +15,12 @@ struct MenuBarContentView: View {
     @State private var isPlaying = false
     @State private var selectedTab = 0
     @State private var isSearching = false
+    @State private var isMusicMode = false
     
     var body: some View {
         VStack(spacing: 0) {
             // Header with search bar
-            HeaderView(searchText: $searchText, isSearching: $isSearching)
+            HeaderView(searchText: $searchText, isSearching: $isSearching, isMusicMode: $isMusicMode)
             
             // Current track display
             if let track = currentTrack {
@@ -37,7 +38,7 @@ struct MenuBarContentView: View {
             
             // Main content area
             TabView(selection: $selectedTab) {
-                SearchResultsView(searchText: searchText, currentTrack: $currentTrack, isSearching: $isSearching)
+                SearchResultsView(searchText: searchText, currentTrack: $currentTrack, isSearching: $isSearching, isMusicMode: isMusicMode)
                     .tabItem {
                         Image(systemName: "magnifyingglass")
                         Text("Search")
@@ -76,6 +77,7 @@ struct MenuBarContentView: View {
 struct HeaderView: View {
     @Binding var searchText: String
     @Binding var isSearching: Bool
+    @Binding var isMusicMode: Bool
     
     var body: some View {
         VStack(spacing: 12) {
@@ -91,41 +93,63 @@ struct HeaderView: View {
             .padding(.horizontal, 16)
             .padding(.top, 16)
             
-            // Search bar
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
-                    .font(.system(size: 14))
-                
-                TextField("Search YouTube music...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 14))
-                    .onSubmit {
-                        if !searchText.isEmpty {
-                            isSearching = true
+            // Search bar with mode toggle
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                        .font(.system(size: 14))
+                    
+                    TextField(isMusicMode ? "Search YouTube Music..." : "Search YouTube...", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 14))
+                        .onSubmit {
+                            if !searchText.isEmpty {
+                                isSearching = true
+                            }
                         }
+                    
+                    if !searchText.isEmpty {
+                        Button(action: {
+                            searchText = ""
+                            isSearching = false
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                                .font(.system(size: 14))
+                        }
+                        .buttonStyle(.plain)
                     }
-                
-                if !searchText.isEmpty {
-                    Button(action: {
-                        searchText = ""
-                        isSearching = false
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                            .font(.system(size: 14))
-                    }
-                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(.controlBackgroundColor))
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                )
+                
+                // Music mode toggle
+                HStack {
+                    HStack(spacing: 6) {
+                        Image(systemName: isMusicMode ? "music.note" : "play.rectangle")
+                            .font(.system(size: 12))
+                            .foregroundColor(isMusicMode ? .blue : .secondary)
+                        
+                        Text(isMusicMode ? "Music Mode" : "General")
+                            .font(.caption)
+                            .foregroundColor(isMusicMode ? .blue : .secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Toggle("", isOn: $isMusicMode)
+                        .toggleStyle(SwitchToggleStyle(tint: .blue))
+                        .scaleEffect(0.8)
+                }
+                .padding(.horizontal, 4)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color(.controlBackgroundColor))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
-            )
             .padding(.horizontal, 16)
         }
         .background(Color(.windowBackgroundColor))
@@ -180,53 +204,132 @@ struct SearchResultsView: View {
     let searchText: String
     @Binding var currentTrack: Track?
     @Binding var isSearching: Bool
-    @State private var searchResults: [SearchResult] = []
+    let isMusicMode: Bool
+    @State private var searchResults: [YTVideoInfo] = []
+    @State private var errorMessage: String?
+    @State private var searchTask: Task<Void, Never>?
+    @StateObject private var ytdlpManager = YTDLPManager.shared
     
     var body: some View {
         VStack(spacing: 0) {
             if searchText.isEmpty {
-                EmptySearchView()
+                EmptySearchView(isMusicMode: isMusicMode)
             } else {
                 if isSearching {
                     LoadingSearchView(searchText: searchText)
+                } else if let error = errorMessage {
+                    ErrorSearchView(error: error) {
+                        retrySearch()
+                    }
                 } else {
                     SearchResultsList(results: searchResults, currentTrack: $currentTrack)
                 }
             }
         }
-        .onChange(of: searchText) { newValue in
+        .onChange(of: searchText) { _, newValue in
+            // Cancel any existing search task
+            searchTask?.cancel()
+            
             if !newValue.isEmpty {
-                // TODO: Implement actual search when yt-dlp is integrated
-                simulateSearch()
+                // Set searching state immediately for UI feedback
+                isSearching = true
+                errorMessage = nil
+                
+                // Create new debounced search task
+                searchTask = Task {
+                    // Wait for 800ms before performing search
+                    try? await Task.sleep(nanoseconds: 800_000_000)
+                    
+                    // Check if task was cancelled (user kept typing)
+                    if !Task.isCancelled {
+                        await performSearchTask()
+                    }
+                }
+            } else {
+                searchResults = []
+                errorMessage = nil
+                isSearching = false
+            }
+        }
+        .onChange(of: isMusicMode) { _, _ in
+            // Re-search when mode changes (with debounce)
+            if !searchText.isEmpty {
+                searchTask?.cancel()
+                isSearching = true
+                errorMessage = nil
+                
+                searchTask = Task {
+                    try? await Task.sleep(nanoseconds: 300_000_000) // Shorter delay for mode change
+                    
+                    if !Task.isCancelled {
+                        await performSearchTask()
+                    }
+                }
+            }
+        }
+        .onDisappear {
+            // Cancel any pending search when view disappears
+            searchTask?.cancel()
+        }
+    }
+    
+    private func retrySearch() {
+        // Cancel any existing search task
+        searchTask?.cancel()
+        
+        if !searchText.isEmpty {
+            isSearching = true
+            errorMessage = nil
+            
+            searchTask = Task {
+                await performSearchTask()
             }
         }
     }
     
-    private func simulateSearch() {
-        // Simulate search delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            searchResults = [
-                SearchResult(id: "1", title: "Sample Song 1", author: "Artist 1", duration: 180),
-                SearchResult(id: "2", title: "Sample Song 2", author: "Artist 2", duration: 240),
-            ]
-            isSearching = false
+    private func performSearchTask() async {
+        guard !searchText.isEmpty else { return }
+        
+        do {
+            let results = try await ytdlpManager.search(query: searchText, musicMode: isMusicMode)
+            
+            await MainActor.run {
+                // Only update if this search wasn't cancelled
+                if !Task.isCancelled {
+                    self.searchResults = results
+                    self.isSearching = false
+                }
+            }
+        } catch {
+            await MainActor.run {
+                // Only update if this search wasn't cancelled
+                if !Task.isCancelled {
+                    self.errorMessage = error.localizedDescription
+                    self.searchResults = []
+                    self.isSearching = false
+                }
+            }
         }
     }
 }
 
 struct EmptySearchView: View {
+    let isMusicMode: Bool
+    
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "magnifyingglass.circle")
+            Image(systemName: isMusicMode ? "music.note.list" : "magnifyingglass.circle")
                 .font(.system(size: 48))
                 .foregroundColor(.secondary.opacity(0.6))
             
             VStack(spacing: 8) {
-                Text("Search YouTube Music")
+                Text(isMusicMode ? "Search YouTube Music" : "Search YouTube")
                     .font(.headline)
                     .foregroundColor(.primary)
                 
-                Text("Enter a song, artist, or album name to find music")
+                Text(isMusicMode ? 
+                     "Search for songs, artists, albums, or playlists" : 
+                     "Search for any YouTube video to play its audio")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -254,39 +357,117 @@ struct LoadingSearchView: View {
     }
 }
 
-struct SearchResultsList: View {
-    let results: [SearchResult]
-    @Binding var currentTrack: Track?
+struct ErrorSearchView: View {
+    let error: String
+    let onRetry: () -> Void
     
     var body: some View {
-        List(results, id: \.id) { result in
-            SearchResultRow(result: result, currentTrack: $currentTrack)
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 48))
+                .foregroundColor(.orange)
+            
+            VStack(spacing: 8) {
+                Text("Search Error")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Text(error)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+            
+            Button("Try Again") {
+                onRetry()
+            }
+            .buttonStyle(.bordered)
         }
-        .listStyle(.plain)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+}
+
+struct SearchResultsList: View {
+    let results: [YTVideoInfo]
+    @Binding var currentTrack: Track?
+    @Environment(\.managedObjectContext) private var viewContext
+    
+    var body: some View {
+        if results.isEmpty {
+            VStack(spacing: 16) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 48))
+                    .foregroundColor(.secondary.opacity(0.6))
+                
+                Text("No Results Found")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Text("Try a different search term")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding()
+        } else {
+            List(results, id: \.id) { result in
+                SearchResultRow(result: result, currentTrack: $currentTrack)
+            }
+            .listStyle(.plain)
+        }
     }
 }
 
 struct SearchResultRow: View {
-    let result: SearchResult
+    let result: YTVideoInfo
     @Binding var currentTrack: Track?
+    @Environment(\.managedObjectContext) private var viewContext
+    @State private var isFavorite = false
+    @State private var isAnimating = false
     
     var body: some View {
         HStack(spacing: 12) {
-            // Thumbnail placeholder
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.secondary.opacity(0.3))
-                .frame(width: 48, height: 48)
-                .overlay(
-                    Image(systemName: "music.note")
-                        .foregroundColor(.secondary)
-                )
+            // Thumbnail
+            AsyncImage(url: getThumbnailURL(from: result.thumbnailURL)) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                case .failure(_):
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.secondary.opacity(0.3))
+                        .overlay(
+                            Image(systemName: "photo")
+                                .foregroundColor(.secondary)
+                        )
+                case .empty:
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.secondary.opacity(0.3))
+                        .overlay(
+                            ProgressView()
+                                .scaleEffect(0.6)
+                        )
+                @unknown default:
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.secondary.opacity(0.3))
+                        .overlay(
+                            Image(systemName: "music.note")
+                                .foregroundColor(.secondary)
+                        )
+                }
+            }
+            .frame(width: 48, height: 48)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(result.title)
                     .font(.headline)
                     .lineLimit(2)
                 
-                Text(result.author)
+                Text(result.uploader)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -298,23 +479,141 @@ struct SearchResultRow: View {
             
             Spacer()
             
-            Button(action: {
-                // TODO: Implement play functionality
-            }) {
-                Image(systemName: "play.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.accentColor)
+            HStack(spacing: 8) {
+                Button(action: {
+                    playTrack(result)
+                }) {
+                    Image(systemName: "play.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.accentColor)
+                }
+                .buttonStyle(.plain)
+                
+                Button(action: {
+                    toggleFavorite(result)
+                }) {
+                    Image(systemName: isFavorite ? "heart.fill" : "heart")
+                        .font(.system(size: 16))
+                        .foregroundColor(isFavorite ? .red : .secondary)
+                        .scaleEffect(isAnimating ? 1.3 : 1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isAnimating)
+                        .animation(.easeInOut(duration: 0.2), value: isFavorite)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())
+        .onAppear {
+            checkIfFavorite()
+        }
+    }
+    
+    private func getThumbnailURL(from thumbnailString: String?) -> URL? {
+        guard let thumbnailString = thumbnailString,
+              !thumbnailString.isEmpty else {
+            // Fallback to constructed URL if we have the video ID
+            return URL(string: "https://i.ytimg.com/vi/\(result.id)/hqdefault.jpg")
+        }
+        
+        // Clean the URL string and create URL
+        let cleanedString = thumbnailString.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = URL(string: cleanedString), 
+           url.scheme != nil {
+            return url
+        }
+        
+        // Fallback to constructed URL
+        return URL(string: "https://i.ytimg.com/vi/\(result.id)/hqdefault.jpg")
     }
     
     private func formatDuration(_ seconds: Int) -> String {
         let minutes = seconds / 60
         let remainingSeconds = seconds % 60
         return String(format: "%d:%02d", minutes, remainingSeconds)
+    }
+    
+    private func playTrack(_ videoInfo: YTVideoInfo) {
+        // Create or update track in Core Data
+        let track = Track(context: viewContext)
+        track.id = videoInfo.id
+        track.title = videoInfo.title
+        track.author = videoInfo.uploader
+        track.duration = Int32(videoInfo.duration)
+        track.thumbnailURL = videoInfo.thumbnailURL
+        track.addedDate = Date()
+        track.isFavorite = false
+        track.isDownloaded = false
+        
+        do {
+            try viewContext.save()
+            currentTrack = track
+            
+            // TODO: Audio streaming will be implemented in Phase 4
+            print("▶️ Track set as current: \(videoInfo.title)")
+            print("🔄 Audio streaming not yet implemented - Phase 4")
+        } catch {
+            print("Failed to save track: \(error)")
+        }
+    }
+    
+    private func checkIfFavorite() {
+        let request: NSFetchRequest<Track> = Track.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@ AND isFavorite == YES", result.id)
+        
+        do {
+            let existingTracks = try viewContext.fetch(request)
+            isFavorite = !existingTracks.isEmpty
+        } catch {
+            print("Failed to check favorite status: \(error)")
+        }
+    }
+    
+    private func toggleFavorite(_ videoInfo: YTVideoInfo) {
+        // Trigger animation
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            isAnimating = true
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation {
+                isAnimating = false
+            }
+        }
+        
+        // Check if track already exists
+        let request: NSFetchRequest<Track> = Track.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", videoInfo.id)
+        
+        do {
+            let existingTracks = try viewContext.fetch(request)
+            let track: Track
+            
+            if let existingTrack = existingTracks.first {
+                track = existingTrack
+            } else {
+                track = Track(context: viewContext)
+                track.id = videoInfo.id
+                track.title = videoInfo.title
+                track.author = videoInfo.uploader
+                track.duration = Int32(videoInfo.duration)
+                track.thumbnailURL = videoInfo.thumbnailURL
+                track.addedDate = Date()
+                track.isDownloaded = false
+            }
+            
+            // Toggle favorite status
+            track.isFavorite = !isFavorite
+            
+            // Update UI state
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isFavorite = track.isFavorite
+            }
+            
+            try viewContext.save()
+        } catch {
+            print("Failed to toggle favorite: \(error)")
+        }
     }
 }
 
@@ -426,13 +725,6 @@ struct FavoriteTrackRow: View {
     }
 }
 
-// Helper struct for search results
-struct SearchResult {
-    let id: String
-    let title: String
-    let author: String
-    let duration: Int
-}
 
 struct SettingsView: View {
     @Environment(\.managedObjectContext) private var viewContext
@@ -577,11 +869,11 @@ struct SettingsView: View {
             .padding(16)
         }
         .onAppear(perform: loadSettings)
-        .onChange(of: defaultDownloadPath) { _ in saveSettings() }
-        .onChange(of: preferredAudioQuality) { _ in saveSettings() }
-        .onChange(of: autoUpdateYTDLP) { _ in saveSettings() }
-        .onChange(of: showMiniPlayer) { _ in saveSettings() }
-        .onChange(of: darkMode) { _ in saveSettings() }
+        .onChange(of: defaultDownloadPath) { _, _ in saveSettings() }
+        .onChange(of: preferredAudioQuality) { _, _ in saveSettings() }
+        .onChange(of: autoUpdateYTDLP) { _, _ in saveSettings() }
+        .onChange(of: showMiniPlayer) { _, _ in saveSettings() }
+        .onChange(of: darkMode) { _, _ in saveSettings() }
     }
     
     private func chooseDownloadLocation() {
