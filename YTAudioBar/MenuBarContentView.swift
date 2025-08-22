@@ -52,10 +52,10 @@ struct MenuBarContentView: View {
                     }
                     .tag(1)
                 
-                FavoritesView(currentTrack: $currentTrack, audioManager: audioManager)
+                PlaylistsView(currentTrack: $currentTrack, audioManager: audioManager)
                     .tabItem {
                         Image(systemName: "heart.fill")
-                        Text("Favorites")
+                        Text("Playlists")
                     }
                     .tag(2)
                 

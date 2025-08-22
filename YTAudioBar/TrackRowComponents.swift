@@ -17,6 +17,7 @@ struct UnifiedTrackRow: View {
     @Environment(\.managedObjectContext) private var viewContext
     @State private var isFavorite = false
     @State private var isAnimating = false
+    @State private var showingPlaylistSelection = false
     
     var body: some View {
         HStack(spacing: 12) {
@@ -51,8 +52,20 @@ struct UnifiedTrackRow: View {
         .background(context.backgroundColor)
         .cornerRadius(context.cornerRadius)
         .contentShape(Rectangle())
+        .contextMenu {
+            PlaylistContextMenu(track: track, isFavorite: isFavorite)
+        }
+        .playlistSelectionSheet(isPresented: $showingPlaylistSelection, track: track)
         .onAppear {
             checkIfFavorite()
+        }
+        .onChange(of: showingPlaylistSelection) { isPresented in
+            // Refresh favorite status when sheet is dismissed
+            if !isPresented {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    checkIfFavorite()
+                }
+            }
         }
     }
     
@@ -127,39 +140,8 @@ struct UnifiedTrackRow: View {
             }
         }
         
-        // Check if track already exists
-        let request: NSFetchRequest<Track> = Track.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@", track.id)
-        
-        do {
-            let existingTracks = try viewContext.fetch(request)
-            let coreDataTrack: Track
-            
-            if let existingTrack = existingTracks.first {
-                coreDataTrack = existingTrack
-            } else {
-                coreDataTrack = Track(context: viewContext)
-                coreDataTrack.id = track.id
-                coreDataTrack.title = track.title
-                coreDataTrack.author = track.uploader
-                coreDataTrack.duration = Int32(track.duration)
-                coreDataTrack.thumbnailURL = track.thumbnailURL
-                coreDataTrack.addedDate = Date()
-                coreDataTrack.isDownloaded = false
-            }
-            
-            // Toggle favorite status
-            coreDataTrack.isFavorite = !isFavorite
-            
-            // Update UI state
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isFavorite = coreDataTrack.isFavorite
-            }
-            
-            try viewContext.save()
-        } catch {
-            print("Failed to toggle favorite: \(error)")
-        }
+        // Show playlist selection popup
+        showingPlaylistSelection = true
     }
 }
 
@@ -265,6 +247,7 @@ struct TrackActionButtons: View {
     let onRemove: (() -> Void)?
     
     @StateObject private var downloadManager = MultiDownloadManager.shared
+    @State private var isRemoving = false
     
     var body: some View {
         HStack(spacing: 8) {
@@ -322,12 +305,32 @@ struct TrackActionButtons: View {
             
             // Remove button (if provided)
             if let removeAction = onRemove {
-                Button(action: removeAction) {
-                    Image(systemName: context.removeButtonIcon)
-                        .font(.system(size: 14))
-                        .foregroundColor(context.removeButtonColor)
+                Button(action: {
+                    guard !isRemoving else { return }
+                    isRemoving = true
+                    
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        removeAction()
+                    }
+                    
+                    // Reset the removing state after a delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        isRemoving = false
+                    }
+                }) {
+                    Group {
+                        if isRemoving {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        } else {
+                            Image(systemName: context.removeButtonIcon)
+                        }
+                    }
+                    .font(.system(size: 14))
+                    .foregroundColor(isRemoving ? .secondary : context.removeButtonColor)
                 }
                 .buttonStyle(.plain)
+                .disabled(isRemoving)
             }
         }
     }
@@ -538,6 +541,106 @@ struct DownloadButton: View {
                 } catch {
                     print("Download failed: \(error)")
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Playlist Context Menu
+
+struct PlaylistContextMenu: View {
+    let track: YTVideoInfo
+    let isFavorite: Bool
+    
+    @StateObject private var favoritesManager = FavoritesManager.shared
+    @State private var playlists: [Playlist] = []
+    
+    var body: some View {
+        Group {
+            // Play action
+            Button("Play") {
+                Task { @MainActor in
+                    await AudioManager.shared.play(track: track)
+                }
+            }
+            
+            // Add to Queue
+            Button("Add to Queue") {
+                QueueManager.shared.addToQueue(track)
+            }
+            
+            Divider()
+            
+            // Favorite toggle
+            if isFavorite {
+                Button("Remove from Favorites") {
+                    removeFavorite()
+                }
+            } else {
+                Button("Add to Favorites") {
+                    addToFavorites()
+                }
+            }
+            
+            // Add to playlist submenu
+            if !playlists.isEmpty {
+                Menu("Add to Playlist") {
+                    ForEach(playlists, id: \.objectID) { playlist in
+                        Button(playlist.name ?? "Unknown") {
+                            addToPlaylist(playlist)
+                        }
+                    }
+                }
+            }
+            
+            Divider()
+            
+            // Download action
+            if !MultiDownloadManager.shared.isDownloaded(track.id) {
+                Button("Download") {
+                    downloadTrack()
+                }
+            }
+        }
+        .onAppear {
+            loadPlaylists()
+        }
+    }
+    
+    private func loadPlaylists() {
+        playlists = favoritesManager.getAllPlaylists().filter { !$0.isSystemPlaylist }
+    }
+    
+    private func addToFavorites() {
+        favoritesManager.addTrackToFavorites(track)
+    }
+    
+    private func removeFavorite() {
+        // Find and remove the track from Core Data
+        let context = PersistenceController.shared.container.viewContext
+        let request: NSFetchRequest<Track> = Track.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", track.id)
+        
+        do {
+            let existingTracks = try context.fetch(request)
+            if let existingTrack = existingTracks.first {
+                favoritesManager.removeTrackFromPlaylist(existingTrack)
+            }
+        } catch {
+            print("Failed to remove favorite: \(error)")
+        }
+    }
+    
+    private func addToPlaylist(_ playlist: Playlist) {
+        favoritesManager.addTrackToPlaylist(track, playlist: playlist)
+    }
+    
+    private func downloadTrack() {
+        Task { @MainActor in
+            do {
+                try await MultiDownloadManager.shared.downloadTrack(track)
+            } catch {
+                print("Download failed: \(error)")
             }
         }
     }
