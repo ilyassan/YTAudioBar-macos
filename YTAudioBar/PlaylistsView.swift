@@ -322,10 +322,23 @@ struct PlaylistDetailView: View {
                 
                 Spacer()
                 
-                // Playlist icon
-                Image(systemName: playlist.isSystemPlaylist ? "heart.circle.fill" : "music.note.list")
-                    .font(.system(size: 20))
-                    .foregroundColor(playlist.isSystemPlaylist ? .red : .accentColor)
+                // Play playlist button and icon
+                HStack(spacing: 8) {
+                    if !tracks.isEmpty {
+                        Button(action: playAllTracks) {
+                            Image(systemName: "play.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(.accentColor)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Play All Tracks")
+                    }
+                    
+                    // Playlist icon
+                    Image(systemName: playlist.isSystemPlaylist ? "heart.circle.fill" : "music.note.list")
+                        .font(.system(size: 20))
+                        .foregroundColor(playlist.isSystemPlaylist ? .red : .accentColor)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -366,6 +379,29 @@ struct PlaylistDetailView: View {
         let currentPlaylist = playlist
         withAnimation(.easeInOut(duration: 0.25)) {
             FavoritesManager.shared.removeTrackFromPlaylist(track, from: currentPlaylist)
+        }
+    }
+    
+    private func playAllTracks() {
+        let videoInfoTracks = tracks.map { track in
+            YTVideoInfo(
+                id: track.id ?? "",
+                title: track.title ?? "Unknown",
+                uploader: track.author ?? "Unknown Artist",
+                duration: Int(track.duration),
+                thumbnailURL: track.thumbnailURL,
+                audioURL: nil,
+                description: nil
+            )
+        }
+        
+        QueueManager.shared.addToQueue(videoInfoTracks)
+        
+        // Start playing the first track if no track is currently playing
+        if audioManager.currentTrack == nil && !videoInfoTracks.isEmpty {
+            Task {
+                await audioManager.play(track: videoInfoTracks.first!)
+            }
         }
     }
 }
