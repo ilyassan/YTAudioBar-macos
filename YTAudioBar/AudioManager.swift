@@ -17,6 +17,7 @@ class AudioManager: NSObject, ObservableObject {
     private var timeObserver: Any?
     private var timeObserverPlayer: AVPlayer? // Track which player the observer belongs to
     private var hasKVOObservers = false // Track if KVO observers are added
+    private var endOfTrackTimer: Timer? // Timer to handle auto-advance based on yt-dlp duration
     
     @Published var isPlaying = false
     @Published var currentPosition: TimeInterval = 0
@@ -28,6 +29,7 @@ class AudioManager: NSObject, ObservableObject {
     @Published var error: Error?
     
     private let ytdlpManager = YTDLPManager.shared
+    private let queueManager = QueueManager.shared
     
     override init() {
         super.init()
@@ -66,6 +68,22 @@ class AudioManager: NSObject, ObservableObject {
         timeObserverPlayer = currentPlayer
     }
     
+    private func setupEndOfTrackTimer(duration: TimeInterval) {
+        // Cancel any existing timer
+        endOfTrackTimer?.invalidate()
+        
+        // Set up timer to fire slightly before the actual end (0.5 seconds early to account for any delays)
+        let timerDuration = max(0.1, duration - 0.5)
+        
+        print("🕐 Setting up end-of-track timer for \(timerDuration) seconds (track duration: \(duration))")
+        
+        endOfTrackTimer = Timer.scheduledTimer(withTimeInterval: timerDuration, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleTrackEnd()
+            }
+        }
+    }
+    
     private func removeTimeObserver() {
         if let timeObserver = timeObserver, let observerPlayer = timeObserverPlayer {
             observerPlayer.removeTimeObserver(timeObserver)
@@ -78,6 +96,10 @@ class AudioManager: NSObject, ObservableObject {
         // Remove time observer properly
         removeTimeObserver()
         
+        // Remove end of track timer
+        endOfTrackTimer?.invalidate()
+        endOfTrackTimer = nil
+        
         // Remove KVO observers safely
         if hasKVOObservers, let item = currentItem {
             item.removeObserver(self, forKeyPath: "status", context: nil)
@@ -85,8 +107,10 @@ class AudioManager: NSObject, ObservableObject {
             hasKVOObservers = false
         }
         
-        // Remove notification observer
-        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: currentItem)
+        // Remove notification observer for the current item
+        if let item = currentItem {
+            NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: item)
+        }
         
         player?.pause()
         player = nil
@@ -143,6 +167,9 @@ class AudioManager: NSObject, ObservableObject {
             if track.duration > 0 {
                 duration = Double(track.duration)
                 print("🎯 Using yt-dlp duration: \(track.duration) seconds (\(track.duration/60):\(String(format: "%02d", track.duration % 60)))")
+                
+                // Setup timer for auto-advance based on accurate duration
+                setupEndOfTrackTimer(duration: duration)
             }
             
             // Setup time observer for new player
@@ -168,9 +195,19 @@ class AudioManager: NSObject, ObservableObject {
         if isPlaying {
             player.pause()
             isPlaying = false
+            // Pause the timer when pausing playback
+            endOfTrackTimer?.invalidate()
+            endOfTrackTimer = nil
         } else {
             player.rate = playbackRate
             isPlaying = true
+            // Resume timer when resuming playback
+            if let track = currentTrack, track.duration > 0 {
+                let remainingTime = duration - currentPosition
+                if remainingTime > 0.5 {
+                    setupEndOfTrackTimer(duration: remainingTime)
+                }
+            }
         }
     }
     
@@ -178,6 +215,9 @@ class AudioManager: NSObject, ObservableObject {
     func pause() {
         player?.pause()
         isPlaying = false
+        // Cancel timer when pausing
+        endOfTrackTimer?.invalidate()
+        endOfTrackTimer = nil
     }
     
     @MainActor
@@ -186,6 +226,9 @@ class AudioManager: NSObject, ObservableObject {
         player?.seek(to: .zero)
         isPlaying = false
         currentPosition = 0
+        // Cancel timer when stopping
+        endOfTrackTimer?.invalidate()
+        endOfTrackTimer = nil
     }
     
     @MainActor
@@ -193,6 +236,14 @@ class AudioManager: NSObject, ObservableObject {
         let time = CMTime(seconds: position, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
         player?.seek(to: time)
         currentPosition = position
+        
+        // Recalculate timer for remaining time if playing
+        if isPlaying, let track = currentTrack, track.duration > 0 {
+            let remainingTime = duration - position
+            if remainingTime > 0.5 {
+                setupEndOfTrackTimer(duration: remainingTime)
+            }
+        }
     }
     
     @MainActor
@@ -208,14 +259,58 @@ class AudioManager: NSObject, ObservableObject {
         player?.rate = isPlaying ? clampedRate : 0.0
     }
     
+    // MARK: - Queue Navigation
+    
+    @MainActor
+    func playNext() async {
+        if let nextTrack = queueManager.playNext() {
+            await play(track: nextTrack)
+        }
+    }
+    
+    @MainActor
+    func playPrevious() async {
+        if let previousTrack = queueManager.playPrevious() {
+            await play(track: previousTrack)
+        }
+    }
+    
+    func canPlayNext() -> Bool {
+        return queueManager.hasNext()
+    }
+    
+    func canPlayPrevious() -> Bool {
+        return queueManager.hasPrevious()
+    }
+    
+    @MainActor
+    private func handleTrackEnd() {
+        print("🕐 Timer-based track end triggered: \(currentTrack?.title ?? "Unknown")")
+        print("🏁 Queue has \(queueManager.queue.count) tracks, current index: \(queueManager.currentIndex)")
+        
+        // Cancel the timer as it's already fired
+        endOfTrackTimer?.invalidate()
+        endOfTrackTimer = nil
+        
+        isPlaying = false
+        currentPosition = duration // Set to end position
+        
+        // Auto-advance to next track in queue
+        Task { @MainActor in
+            if let nextTrack = queueManager.playNext() {
+                print("🎵 Auto-advancing to next track: \(nextTrack.title) (new index: \(queueManager.currentIndex))")
+                await play(track: nextTrack)
+            } else {
+                print("🏁 End of queue reached - no more tracks to play")
+            }
+        }
+    }
+    
     @objc private func playerItemDidReachEnd() {
         Task { @MainActor in
-            print("🏁 Track ended")
-            isPlaying = false
-            currentPosition = duration // Set to end position
-            
-            // Optionally: Auto-play next track, loop, etc.
-            // For now, just stop at the end
+            print("🏁 AVPlayer track ended notification (may be delayed): \(currentTrack?.title ?? "Unknown")")
+            // Don't handle auto-advance here anymore, let the timer handle it
+            // This is just for fallback logging
         }
     }
     

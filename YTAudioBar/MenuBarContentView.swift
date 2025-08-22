@@ -194,11 +194,13 @@ struct CurrentTrackView: View {
                 
                 HStack(spacing: 12) {
                     Button(action: {
-                        // TODO: Previous track
+                        Task { @MainActor in
+                            await audioManager.playPrevious()
+                        }
                     }) {
                         Image(systemName: "backward.fill")
                     }
-                    .disabled(true)
+                    .disabled(!audioManager.canPlayPrevious())
                     
                     Button(action: {
                         audioManager.togglePlayPause()
@@ -208,11 +210,13 @@ struct CurrentTrackView: View {
                     .disabled(audioManager.currentTrack == nil)
                     
                     Button(action: {
-                        // TODO: Next track
+                        Task { @MainActor in
+                            await audioManager.playNext()
+                        }
                     }) {
                         Image(systemName: "forward.fill")
                     }
-                    .disabled(true)
+                    .disabled(!audioManager.canPlayNext())
                 }
                 .foregroundColor(.primary)
             }
@@ -527,229 +531,111 @@ struct SearchResultRow: View {
     let result: YTVideoInfo
     @Binding var currentTrack: Track?
     @ObservedObject var audioManager: AudioManager
-    @Environment(\.managedObjectContext) private var viewContext
-    @State private var isFavorite = false
-    @State private var isAnimating = false
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Thumbnail
-            AsyncImage(url: getThumbnailURL(from: result.thumbnailURL)) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                case .failure(_):
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.secondary.opacity(0.3))
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.secondary)
-                        )
-                case .empty:
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.secondary.opacity(0.3))
-                        .overlay(
-                            ProgressView()
-                                .scaleEffect(0.6)
-                        )
-                @unknown default:
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.secondary.opacity(0.3))
-                        .overlay(
-                            Image(systemName: "music.note")
-                                .foregroundColor(.secondary)
-                        )
-                }
-            }
-            .frame(width: 64, height: 36)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(result.title)
-                    .font(.headline)
-                    .lineLimit(2)
-                
-                Text(result.uploader)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                
-                Text(formatDuration(result.duration))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            HStack(spacing: 8) {
-                Button(action: {
-                    if audioManager.currentTrack?.id == result.id && audioManager.isPlaying {
-                        audioManager.togglePlayPause()
-                    } else {
-                        playTrack(result)
-                    }
-                }) {
-                    Group {
-                        if audioManager.currentTrack?.id == result.id && audioManager.isLoading {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        } else if audioManager.currentTrack?.id == result.id && audioManager.isPlaying {
-                            Image(systemName: "pause.circle.fill")
-                        } else {
-                            Image(systemName: "play.circle.fill")
-                        }
-                    }
-                    .font(.title2)
-                    .foregroundColor(.accentColor)
-                    .frame(width: 20, height: 20)
-                }
-                .buttonStyle(.plain)
-                
-                Button(action: {
-                    toggleFavorite(result)
-                }) {
-                    Image(systemName: isFavorite ? "heart.fill" : "heart")
-                        .font(.system(size: 16))
-                        .foregroundColor(isFavorite ? .red : .secondary)
-                        .scaleEffect(isAnimating ? 1.3 : 1.0)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isAnimating)
-                        .animation(.easeInOut(duration: 0.2), value: isFavorite)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.vertical, 8)
-        .contentShape(Rectangle())
-        .onAppear {
-            checkIfFavorite()
-        }
-    }
-    
-    private func getThumbnailURL(from thumbnailString: String?) -> URL? {
-        guard let thumbnailString = thumbnailString,
-              !thumbnailString.isEmpty else {
-            // Fallback to constructed URL if we have the video ID
-            return URL(string: "https://i.ytimg.com/vi/\(result.id)/hqdefault.jpg")
-        }
-        
-        // Clean the URL string and create URL
-        let cleanedString = thumbnailString.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let url = URL(string: cleanedString), 
-           url.scheme != nil {
-            return url
-        }
-        
-        // Fallback to constructed URL
-        return URL(string: "https://i.ytimg.com/vi/\(result.id)/hqdefault.jpg")
-    }
-    
-    private func formatDuration(_ seconds: Int) -> String {
-        let minutes = seconds / 60
-        let remainingSeconds = seconds % 60
-        return String(format: "%d:%02d", minutes, remainingSeconds)
-    }
-    
-    private func playTrack(_ videoInfo: YTVideoInfo) {
-        // Show loading immediately for instant feedback
-        audioManager.currentTrack = videoInfo
-        audioManager.isLoading = true
-        audioManager.isPlaying = false
-        
-        // Perform Core Data operations on main queue
-        DispatchQueue.main.async {
-            // Create or update track in Core Data
-            let track = Track(context: viewContext)
-            track.id = videoInfo.id
-            track.title = videoInfo.title
-            track.author = videoInfo.uploader
-            track.duration = Int32(videoInfo.duration)
-            track.thumbnailURL = videoInfo.thumbnailURL
-            track.addedDate = Date()
-            track.isFavorite = false
-            track.isDownloaded = false
-            
-            do {
-                try viewContext.save()
-                currentTrack = track
-                
-                // Start audio playback using AudioManager
-                Task { @MainActor in
-                    await audioManager.play(track: videoInfo)
-                }
-                
-                print("▶️ Playing: \(videoInfo.title)")
-            } catch {
-                print("Failed to save track: \(error)")
-            }
-        }
-    }
-    
-    private func checkIfFavorite() {
-        let request: NSFetchRequest<Track> = Track.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@ AND isFavorite == YES", result.id)
-        
-        do {
-            let existingTracks = try viewContext.fetch(request)
-            isFavorite = !existingTracks.isEmpty
-        } catch {
-            print("Failed to check favorite status: \(error)")
-        }
-    }
-    
-    private func toggleFavorite(_ videoInfo: YTVideoInfo) {
-        // Trigger animation
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-            isAnimating = true
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation {
-                isAnimating = false
-            }
-        }
-        
-        // Check if track already exists
-        let request: NSFetchRequest<Track> = Track.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@", videoInfo.id)
-        
-        do {
-            let existingTracks = try viewContext.fetch(request)
-            let track: Track
-            
-            if let existingTrack = existingTracks.first {
-                track = existingTrack
-            } else {
-                track = Track(context: viewContext)
-                track.id = videoInfo.id
-                track.title = videoInfo.title
-                track.author = videoInfo.uploader
-                track.duration = Int32(videoInfo.duration)
-                track.thumbnailURL = videoInfo.thumbnailURL
-                track.addedDate = Date()
-                track.isDownloaded = false
-            }
-            
-            // Toggle favorite status
-            track.isFavorite = !isFavorite
-            
-            // Update UI state
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isFavorite = track.isFavorite
-            }
-            
-            try viewContext.save()
-        } catch {
-            print("Failed to toggle favorite: \(error)")
-        }
+        UnifiedTrackRow(
+            track: result,
+            context: .searchResult(isCurrentTrack: audioManager.currentTrack?.id == result.id),
+            audioManager: audioManager
+        )
     }
 }
 
 struct QueueView: View {
     @Binding var currentTrack: Track?
     @ObservedObject var audioManager: AudioManager
+    @StateObject private var queueManager = QueueManager.shared
     
+    var body: some View {
+        VStack(spacing: 0) {
+            // Queue header with controls
+            QueueHeaderView(queueManager: queueManager, audioManager: audioManager)
+            
+            if queueManager.queue.isEmpty {
+                EmptyQueueView()
+            } else {
+                QueueListView(queueManager: queueManager, audioManager: audioManager, currentTrack: $currentTrack)
+            }
+        }
+    }
+}
+
+struct QueueHeaderView: View {
+    @ObservedObject var queueManager: QueueManager
+    @ObservedObject var audioManager: AudioManager
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("Queue")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                
+                Spacer()
+                
+                if !queueManager.queue.isEmpty {
+                    Button(action: {
+                        queueManager.clearQueue()
+                    }) {
+                        Image(systemName: "trash")
+                            .foregroundColor(.red)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            
+            if !queueManager.queue.isEmpty {
+                HStack {
+                    Text(queueManager.queueInfo)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            queueManager.toggleShuffle()
+                        }) {
+                            Image(systemName: queueManager.shuffleMode ? "shuffle.circle.fill" : "shuffle")
+                                .foregroundColor(queueManager.shuffleMode ? .blue : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Button(action: {
+                            queueManager.cycleRepeatMode()
+                        }) {
+                            Image(systemName: repeatIcon)
+                                .foregroundColor(queueManager.repeatMode != .off ? .blue : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color(.controlBackgroundColor))
+        .overlay(
+            Rectangle()
+                .frame(height: 1)
+                .foregroundColor(.secondary.opacity(0.2)),
+            alignment: .bottom
+        )
+    }
+    
+    private var repeatIcon: String {
+        switch queueManager.repeatMode {
+        case .off:
+            return "repeat"
+        case .all:
+            return "repeat.circle.fill"
+        case .one:
+            return "repeat.1.circle.fill"
+        }
+    }
+}
+
+struct EmptyQueueView: View {
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "list.bullet.circle")
@@ -769,6 +655,97 @@ struct QueueView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
+    }
+}
+
+struct QueueListView: View {
+    @ObservedObject var queueManager: QueueManager
+    @ObservedObject var audioManager: AudioManager
+    @Binding var currentTrack: Track?
+    
+    var body: some View {
+        List(queueManager.queue.indices, id: \.self) { index in
+            QueueTrackRow(
+                track: queueManager.queue[index],
+                index: index,
+                isCurrentTrack: index == queueManager.currentIndex,
+                queueManager: queueManager,
+                audioManager: audioManager,
+                currentTrack: $currentTrack
+            )
+            .onDrag {
+                NSItemProvider(object: "\(index)" as NSString)
+            }
+            .onDrop(of: [.text], delegate: QueueDropDelegate(
+                queueManager: queueManager,
+                currentIndex: index
+            ))
+        }
+        .listStyle(.plain)
+    }
+}
+
+struct QueueDropDelegate: DropDelegate {
+    let queueManager: QueueManager
+    let currentIndex: Int
+    
+    func performDrop(info: DropInfo) -> Bool {
+        guard let itemProvider = info.itemProviders(for: [.text]).first else { return false }
+        
+        itemProvider.loadItem(forTypeIdentifier: "public.text", options: nil) { data, error in
+            guard let data = data as? Data,
+                  let sourceIndexString = String(data: data, encoding: .utf8),
+                  let sourceIndex = Int(sourceIndexString) else { return }
+            
+            DispatchQueue.main.async {
+                queueManager.moveTrack(from: sourceIndex, to: currentIndex)
+            }
+        }
+        return true
+    }
+    
+    func dropEntered(info: DropInfo) {
+        // Optional: Add visual feedback when dragging over
+    }
+    
+    func dropExited(info: DropInfo) {
+        // Optional: Remove visual feedback
+    }
+}
+
+struct QueueTrackRow: View {
+    let track: YTVideoInfo
+    let index: Int
+    let isCurrentTrack: Bool
+    @ObservedObject var queueManager: QueueManager
+    @ObservedObject var audioManager: AudioManager
+    @Binding var currentTrack: Track?
+    @Environment(\.managedObjectContext) private var viewContext
+    
+    var body: some View {
+        UnifiedTrackRow(
+            track: track,
+            context: .queue(
+                index: index,
+                isCurrentTrack: isCurrentTrack,
+                onPlay: { playTrackFromQueue(track, at: index) },
+                onRemove: { queueManager.removeFromQueue(at: index) }
+            ),
+            audioManager: audioManager
+        )
+    }
+    
+    private func playTrackFromQueue(_ videoInfo: YTVideoInfo, at index: Int) {
+        if isCurrentTrack && audioManager.isPlaying {
+            audioManager.togglePlayPause()
+        } else {
+            // Play track from queue
+            if let track = queueManager.playTrack(at: index) {
+                Task { @MainActor in
+                    await audioManager.play(track: track)
+                }
+            }
+        }
     }
 }
 
@@ -821,132 +798,26 @@ struct FavoriteTrackRow: View {
     @Environment(\.managedObjectContext) private var viewContext
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Thumbnail with rectangle aspect ratio
-            AsyncImage(url: getThumbnailURL(from: track.thumbnailURL)) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                case .failure(_):
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.secondary.opacity(0.3))
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.secondary)
-                                .font(.system(size: 12))
-                        )
-                case .empty:
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.secondary.opacity(0.3))
-                        .overlay(
-                            ProgressView()
-                                .scaleEffect(0.5)
-                        )
-                @unknown default:
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.secondary.opacity(0.3))
-                        .overlay(
-                            Image(systemName: "music.note")
-                                .foregroundColor(.secondary)
-                                .font(.system(size: 12))
-                        )
-                }
-            }
-            .frame(width: 56, height: 32)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(track.title ?? "Unknown")
-                    .font(.headline)
-                    .lineLimit(1)
-                
-                HStack {
-                    Text(track.author ?? "Unknown Artist")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                    
-                    Spacer()
-                    
-                    Text(formatDuration(Int(track.duration)))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            Spacer()
-            
-            HStack(spacing: 8) {
-                Button(action: {
-                    // Create YTVideoInfo from Track for playback
-                    let videoInfo = YTVideoInfo(
-                        id: track.id ?? "",
-                        title: track.title ?? "Unknown",
-                        uploader: track.author ?? "Unknown Artist",
-                        duration: Int(track.duration),
-                        thumbnailURL: track.thumbnailURL,
-                        audioURL: nil,
-                        description: nil
-                    )
-                    
-                    currentTrack = track
-                    Task { @MainActor in
-                        await audioManager.play(track: videoInfo)
-                    }
-                }) {
-                    Group {
-                        if audioManager.currentTrack?.id == track.id && audioManager.isLoading {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        } else if audioManager.currentTrack?.id == track.id && audioManager.isPlaying {
-                            Image(systemName: "pause.circle.fill")
-                        } else {
-                            Image(systemName: "play.circle.fill")
-                        }
-                    }
-                    .font(.title3)
-                    .foregroundColor(.accentColor)
-                    .frame(width: 20, height: 20)
-                }
-                .buttonStyle(.plain)
-                
-                Button(action: {
-                    removeFavorite(track)
-                }) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 14))
-                        .foregroundColor(.red)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.vertical, 6)
-    }
-    
-    private func getThumbnailURL(from thumbnailString: String?) -> URL? {
-        guard let thumbnailString = thumbnailString,
-              !thumbnailString.isEmpty else {
-            // Fallback to constructed URL if we have the video ID
-            return URL(string: "https://i.ytimg.com/vi/\(track.id ?? "")/hqdefault.jpg")
-        }
+        let videoInfo = YTVideoInfo(
+            id: track.id ?? "",
+            title: track.title ?? "Unknown",
+            uploader: track.author ?? "Unknown Artist",
+            duration: Int(track.duration),
+            thumbnailURL: track.thumbnailURL,
+            audioURL: nil,
+            description: nil
+        )
         
-        // Clean the URL string and create URL
-        let cleanedString = thumbnailString.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let url = URL(string: cleanedString), 
-           url.scheme != nil {
-            return url
-        }
+        let isCurrentTrack = audioManager.currentTrack?.id == track.id
         
-        // Fallback to constructed URL
-        return URL(string: "https://i.ytimg.com/vi/\(track.id ?? "")/hqdefault.jpg")
-    }
-    
-    private func formatDuration(_ seconds: Int) -> String {
-        let minutes = seconds / 60
-        let remainingSeconds = seconds % 60
-        return String(format: "%d:%02d", minutes, remainingSeconds)
+        UnifiedTrackRow(
+            track: videoInfo,
+            context: .favorite(
+                onRemove: { removeFavorite(track) },
+                isCurrentTrack: isCurrentTrack
+            ),
+            audioManager: audioManager
+        )
     }
     
     private func removeFavorite(_ track: Track) {
