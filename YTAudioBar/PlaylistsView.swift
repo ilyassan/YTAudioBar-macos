@@ -148,7 +148,7 @@ struct PlaylistsView: View {
         let trimmedName = newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
         
-        let newPlaylist = favoritesManager.createPlaylist(name: trimmedName)
+        _ = favoritesManager.createPlaylist(name: trimmedName)
         newPlaylistName = ""
     }
     
@@ -172,16 +172,11 @@ struct PlaylistCard: View {
     let onTap: () -> Void
     let onShowOptions: () -> Void
     
-    // Real-time track count using @FetchRequest for "All Favorites"
-    @FetchRequest private var favoriteTracksCount: FetchedResults<Track>
+    // Real-time track count using @FetchRequest for playlist memberships
+    @FetchRequest private var membershipCount: FetchedResults<PlaylistMembership>
     
-    // Custom playlist tracks are handled through the playlist.tracks relationship
     var trackCount: Int {
-        if playlist.name == "All Favorites" {
-            return favoriteTracksCount.count
-        } else {
-            return playlist.tracks?.count ?? 0
-        }
+        return membershipCount.count
     }
     
     init(playlist: Playlist, onTap: @escaping () -> Void, onShowOptions: @escaping () -> Void) {
@@ -189,75 +184,53 @@ struct PlaylistCard: View {
         self.onTap = onTap
         self.onShowOptions = onShowOptions
         
-        // Set up real-time fetch request for favorites count
-        if playlist.name == "All Favorites" {
-            self._favoriteTracksCount = FetchRequest(
-                sortDescriptors: [],
-                predicate: NSPredicate(format: "isFavorite == YES")
-            )
-        } else {
-            // For non-favorite playlists, use empty fetch request (won't be used)
-            self._favoriteTracksCount = FetchRequest(
-                sortDescriptors: [],
-                predicate: NSPredicate(value: false) // Always returns 0 results
-            )
-        }
+        // Set up real-time fetch request for membership count
+        self._membershipCount = FetchRequest(
+            sortDescriptors: [],
+            predicate: NSPredicate(format: "playlist == %@", playlist)
+        )
     }
     
     var body: some View {
-        ZStack {
-            HStack(spacing: 16) {
-                // Icon
-                VStack {
-                    Image(systemName: playlist.isSystemPlaylist ? "heart.circle.fill" : "music.note.list")
-                        .font(.system(size: 32))
-                        .foregroundColor(playlist.isSystemPlaylist ? .red : .accentColor)
-                    
-                    Spacer()
-                }
-                
-                // Content
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(playlist.name ?? "Unknown Playlist")
-                        .font(.headline)
-                        .fontWeight(.medium)
-                        .lineLimit(1)
-                    
-                    Text("\(trackCount) track\(trackCount == 1 ? "" : "s")")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    
-                    if let createdDate = playlist.createdDate, !playlist.isSystemPlaylist {
-                        Text("Created \(createdDate, formatter: relativeDateFormatter)")
-                            .font(.caption)
-                            .foregroundColor(.secondary.opacity(0.7))
-                    }
-                    
-                    Spacer()
-                }
+        HStack(spacing: 16) {
+            // Icon
+            VStack {
+                Image(systemName: playlist.isSystemPlaylist ? "heart.circle.fill" : "music.note.list")
+                    .font(.system(size: 32))
+                    .foregroundColor(playlist.isSystemPlaylist ? .red : .accentColor)
                 
                 Spacer()
+            }
+            
+            // Content
+            VStack(alignment: .leading, spacing: 6) {
+                Text(playlist.name ?? "Unknown Playlist")
+                    .font(.headline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                
+                Text("\(trackCount) track\(trackCount == 1 ? "" : "s")")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            // Three dots button and arrow indicator
+            HStack(spacing: 8) {
+                if !playlist.isSystemPlaylist {
+                    Button(action: onShowOptions) {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
                 
                 // Arrow indicator
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14))
                     .foregroundColor(.secondary.opacity(0.6))
-            }
-            
-            // Three dots button positioned in top-right
-            if !playlist.isSystemPlaylist {
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button(action: onShowOptions) {
-                            Image(systemName: "ellipsis.circle")
-                                .font(.system(size: 16))
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    Spacer()
-                }
             }
         }
         .padding(16)
@@ -312,18 +285,11 @@ struct PlaylistDetailView: View {
         self._currentTrack = currentTrack
         self.audioManager = audioManager
         
-        // Set up the fetch request based on playlist type
-        if playlist.name == "All Favorites" {
-            self._tracks = FetchRequest(
-                sortDescriptors: [NSSortDescriptor(keyPath: \Track.addedDate, ascending: false)],
-                predicate: NSPredicate(format: "isFavorite == YES")
-            )
-        } else {
-            self._tracks = FetchRequest(
-                sortDescriptors: [NSSortDescriptor(keyPath: \Track.addedDate, ascending: false)],
-                predicate: NSPredicate(format: "playlist == %@", playlist)
-            )
-        }
+        // Set up the fetch request to get tracks through memberships
+        self._tracks = FetchRequest(
+            sortDescriptors: [NSSortDescriptor(keyPath: \Track.addedDate, ascending: false)],
+            predicate: NSPredicate(format: "ANY playlistMemberships.playlist == %@", playlist)
+        )
     }
     
     var body: some View {
@@ -332,15 +298,10 @@ struct PlaylistDetailView: View {
             HStack {
                 // Back button
                 Button(action: { dismiss() }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .semibold))
-                        
-                        Text("Playlists")
-                            .font(.system(size: 14, weight: .medium))
-                    }
-                    .foregroundColor(.accentColor)
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .semibold))
                 }
+                .foregroundColor(.accentColor)
                 .buttonStyle(.plain)
                 .keyboardShortcut(.escape, modifiers: [])
                 .help("Back to Playlists (Esc)")
@@ -402,8 +363,9 @@ struct PlaylistDetailView: View {
     }
     
     private func removeTrackFromPlaylist(_ track: Track) {
+        let currentPlaylist = playlist
         withAnimation(.easeInOut(duration: 0.25)) {
-            FavoritesManager.shared.removeTrackFromPlaylist(track)
+            FavoritesManager.shared.removeTrackFromPlaylist(track, from: currentPlaylist)
         }
     }
 }
