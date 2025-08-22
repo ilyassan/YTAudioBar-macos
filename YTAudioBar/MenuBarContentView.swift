@@ -175,10 +175,107 @@ struct CurrentTrackView: View {
     @ObservedObject var audioManager: AudioManager
     @State private var isSeekingManually = false
     @State private var seekPosition: Double = 0
+    @State private var isExpanded = false
     
     var body: some View {
+        VStack(spacing: 0) {
+            if isExpanded {
+                expandedPlayerView()
+            } else {
+                minimizedPlayerView()
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: isExpanded)
+    }
+    
+    @ViewBuilder
+    private func minimizedPlayerView() -> some View {
+        HStack(spacing: 12) {
+            // Left: Audio wave visualization
+            AudioWaveView(isPlaying: audioManager.isPlaying)
+                .frame(width: 50, height: 20)
+            
+            // Center: Track info with scrolling title
+            VStack(alignment: .leading, spacing: 0) {
+                ScrollingText(text: ytTrack?.title ?? track?.title ?? "Unknown")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
+                
+                if let artist = ytTrack?.uploader ?? track?.author {
+                    Text(artist)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            
+            // Right: Essential controls (positioned lower)
+            VStack {
+                Spacer(minLength: 25)
+                
+                HStack(spacing: 6) {
+                    Button(action: {
+                        Task { @MainActor in
+                            await audioManager.playPrevious()
+                        }
+                    }) {
+                        Image(systemName: "backward.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white)
+                    }
+                    .disabled(!audioManager.canPlayPrevious())
+                    .buttonStyle(.plain)
+                    .opacity(audioManager.canPlayPrevious() ? 1.0 : 0.4)
+                    
+                    Button(action: {
+                        audioManager.togglePlayPause()
+                    }) {
+                        Image(systemName: audioManager.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.white)
+                    }
+                    .disabled(audioManager.currentTrack == nil)
+                    .buttonStyle(.plain)
+                    
+                    Button(action: {
+                        Task { @MainActor in
+                            await audioManager.playNext()
+                        }
+                    }) {
+                        Image(systemName: "forward.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white)
+                    }
+                    .disabled(!audioManager.canPlayNext())
+                    .buttonStyle(.plain)
+                    .opacity(audioManager.canPlayNext() ? 1.0 : 0.4)
+                    
+                    Divider()
+                        .frame(height: 16)
+                        .foregroundColor(.white.opacity(0.3))
+                    
+                    Button(action: { isExpanded.toggle() }) {
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 10))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+        .cornerRadius(8)
+        .frame(height: 44)
+    }
+    
+    @ViewBuilder
+    private func expandedPlayerView() -> some View {
         VStack(spacing: 8) {
-            // Track info and basic controls
+            // Header with minimize button
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(ytTrack?.title ?? track?.title ?? "Unknown")
@@ -199,40 +296,48 @@ struct CurrentTrackView: View {
                         .frame(width: 20, height: 20)
                 }
                 
-                HStack(spacing: 12) {
-                    Button(action: {
-                        Task { @MainActor in
-                            await audioManager.playPrevious()
-                        }
-                    }) {
-                        Image(systemName: "backward.fill")
-                    }
-                    .disabled(!audioManager.canPlayPrevious())
-                    
-                    Button(action: {
-                        audioManager.togglePlayPause()
-                    }) {
-                        Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
-                    }
-                    .disabled(audioManager.currentTrack == nil)
-                    
-                    Button(action: {
-                        Task { @MainActor in
-                            await audioManager.playNext()
-                        }
-                    }) {
-                        Image(systemName: "forward.fill")
-                    }
-                    .disabled(!audioManager.canPlayNext())
+                // Minimize button
+                Button(action: { isExpanded.toggle() }) {
+                    Image(systemName: "arrow.down.right.and.arrow.up.left")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
                 }
-                .foregroundColor(.primary)
+                .buttonStyle(.plain)
             }
             
-            // Progress bar with seek functionality - show even during loading
+            // Playback controls
+            HStack(spacing: 12) {
+                Button(action: {
+                    Task { @MainActor in
+                        await audioManager.playPrevious()
+                    }
+                }) {
+                    Image(systemName: "backward.fill")
+                }
+                .disabled(!audioManager.canPlayPrevious())
+                
+                Button(action: {
+                    audioManager.togglePlayPause()
+                }) {
+                    Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
+                }
+                .disabled(audioManager.currentTrack == nil)
+                
+                Button(action: {
+                    Task { @MainActor in
+                        await audioManager.playNext()
+                    }
+                }) {
+                    Image(systemName: "forward.fill")
+                }
+                .disabled(!audioManager.canPlayNext())
+            }
+            .foregroundColor(.primary)
+            
+            // Progress bar with seek functionality
             if audioManager.currentTrack != nil {
                 VStack(spacing: 4) {
                     if audioManager.isLoading {
-                        // Show indeterminate progress during loading
                         ProgressView()
                             .scaleEffect(0.8)
                             .frame(height: 20)
@@ -261,7 +366,7 @@ struct CurrentTrackView: View {
                         
                         Spacer()
                         
-                        // Playback speed control - disable during loading
+                        // Playback speed control
                         HStack(spacing: 4) {
                             Button(action: {
                                 let newRate = max(0.25, audioManager.playbackRate - 0.25)
@@ -301,6 +406,7 @@ struct CurrentTrackView: View {
                 .padding(.horizontal, 4)
             }
         }
+        .padding(12)
     }
     
     private func formatTime(_ seconds: Double) -> String {
@@ -308,6 +414,138 @@ struct CurrentTrackView: View {
         let minutes = totalSeconds / 60
         let remainingSeconds = totalSeconds % 60
         return String(format: "%d:%02d", minutes, remainingSeconds)
+    }
+}
+
+// Audio Wave Visualization
+struct AudioWaveView: View {
+    let isPlaying: Bool
+    @State private var animationTimer: Timer?
+    @State private var waveHeights: [CGFloat] = Array(repeating: 1, count: 8)
+    
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(0..<waveHeights.count, id: \.self) { index in
+                Capsule()
+                    .fill(isPlaying ? 
+                          Color.accentColor.opacity(0.8) : 
+                          Color.secondary.opacity(0.3))
+                    .frame(width: 3, height: waveHeights[index])
+                    .animation(.easeInOut(duration: 0.15), value: waveHeights[index])
+            }
+        }
+        .onAppear {
+            if isPlaying {
+                startAnimation()
+            }
+        }
+        .onChange(of: isPlaying) { playing in
+            if playing {
+                startAnimation()
+            } else {
+                stopAnimation()
+            }
+        }
+    }
+    
+    private func startAnimation() {
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { _ in
+            withAnimation(.easeInOut(duration: 0.12)) {
+                for i in 0..<waveHeights.count {
+                    let baseHeight: CGFloat = 3
+                    let maxHeight: CGFloat = 18
+                    let randomness = CGFloat.random(in: 0.4...1.0)
+                    let wavePhase = sin(Double(i) * 0.9 + Date().timeIntervalSince1970 * 6.0)
+                    let height = baseHeight + (maxHeight - baseHeight) * randomness * CGFloat(abs(wavePhase))
+                    waveHeights[i] = max(baseHeight, height)
+                }
+            }
+        }
+    }
+    
+    private func stopAnimation() {
+        animationTimer?.invalidate()
+        animationTimer = nil
+        withAnimation(.easeOut(duration: 0.4)) {
+            for i in 0..<waveHeights.count {
+                waveHeights[i] = 3
+            }
+        }
+    }
+}
+
+// Scrolling Text Component
+struct ScrollingText: View {
+    let text: String
+    @State private var scrollOffset: CGFloat = 0
+    @State private var textWidth: CGFloat = 0
+    @State private var containerWidth: CGFloat = 0
+    @State private var scrollTimer: Timer?
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                // First copy of text
+                Text(text)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .offset(x: scrollOffset)
+                
+                // Second copy for seamless loop (only if text is longer than container)
+                if textWidth > 0 && textWidth > containerWidth {
+                    Text(text)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .offset(x: scrollOffset + textWidth + 30) // 30px gap between copies
+                }
+            }
+            .background(
+                Text(text)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .opacity(0)
+                    .background(GeometryReader { textGeo in
+                        Color.clear.onAppear {
+                            textWidth = textGeo.size.width
+                            containerWidth = geometry.size.width
+                            startScrolling()
+                        }
+                    })
+            )
+            .clipped()
+        }
+        .onAppear {
+            startScrolling()
+        }
+        .onDisappear {
+            stopScrolling()
+        }
+        .onChange(of: text) { _ in
+            stopScrolling()
+            scrollOffset = 0
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                startScrolling()
+            }
+        }
+    }
+    
+    private func startScrolling() {
+        guard textWidth > containerWidth else { return }
+        
+        scrollTimer?.invalidate()
+        scrollOffset = 0
+        
+        _ = textWidth + 30 // Text width + gap for calculation reference
+        
+        scrollTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
+            scrollOffset -= 25 * 0.016 // 25 pixels per second
+            
+            if scrollOffset <= -(textWidth + 30) {
+                scrollOffset = 0 // Reset for infinite loop
+            }
+        }
+    }
+    
+    private func stopScrolling() {
+        scrollTimer?.invalidate()
+        scrollTimer = nil
     }
 }
 
@@ -763,7 +1001,7 @@ struct FavoritesView: View {
     
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Track.addedDate, ascending: false)],
-        predicate: NSPredicate(format: "isFavorite == YES"),
+        predicate: NSPredicate(format: "ANY playlistMemberships.playlist.name == %@ AND ANY playlistMemberships.playlist.isSystemPlaylist == YES", "All Favorites"),
         animation: .default)
     private var favoritesTracks: FetchedResults<Track>
     
@@ -828,8 +1066,8 @@ struct FavoriteTrackRow: View {
     }
     
     private func removeFavorite(_ track: Track) {
-        // Remove from favorites but don't delete the track completely
-        track.isFavorite = false
+        // Remove from favorites playlist
+        FavoritesManager.shared.removeTrackFromPlaylist(track)
         
         do {
             try viewContext.save()
