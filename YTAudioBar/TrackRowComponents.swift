@@ -234,9 +234,15 @@ struct TrackInfo: View {
                 .foregroundColor(.secondary)
                 .lineLimit(1)
             
-            Text(formatDuration(track.duration))
-                .font(.caption)
-                .foregroundColor(.secondary)
+            if track.duration > 0 {
+                Text(formatDuration(track.duration))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                Text("--:--")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
     }
     
@@ -257,6 +263,8 @@ struct TrackActionButtons: View {
     let onPlay: () -> Void
     let onAddToQueue: () -> Void
     let onRemove: (() -> Void)?
+    
+    @StateObject private var downloadManager = MultiDownloadManager.shared
     
     var body: some View {
         HStack(spacing: 8) {
@@ -279,7 +287,7 @@ struct TrackActionButtons: View {
                     }
                 }
                 .font(context.buttonFont)
-                .foregroundColor(.accentColor)
+                .foregroundColor(downloadManager.isDownloaded(track.id) ? .green : .accentColor)
                 .frame(width: 20, height: 20)
             }
             .buttonStyle(.plain)
@@ -307,6 +315,11 @@ struct TrackActionButtons: View {
                 .buttonStyle(.plain)
             }
             
+            // Download button (if enabled and not already downloaded)
+            if context.showDownload && !downloadManager.isDownloaded(track.id) {
+                DownloadButton(track: track, downloadManager: downloadManager)
+            }
+            
             // Remove button (if provided)
             if let removeAction = onRemove {
                 Button(action: removeAction) {
@@ -325,6 +338,7 @@ struct TrackActionButtons: View {
 struct TrackRowContext {
     let showAddToQueue: Bool
     let showFavorite: Bool
+    let showDownload: Bool
     let thumbnailSize: CGSize
     let buttonFont: Font
     let verticalPadding: CGFloat
@@ -342,6 +356,7 @@ struct TrackRowContext {
         TrackRowContext(
             showAddToQueue: true,
             showFavorite: true,
+            showDownload: true,
             thumbnailSize: CGSize(width: 64, height: 36),
             buttonFont: .title2,
             verticalPadding: 8,
@@ -360,6 +375,7 @@ struct TrackRowContext {
         TrackRowContext(
             showAddToQueue: true,
             showFavorite: false, // Don't show favorite button in favorites list
+            showDownload: true,
             thumbnailSize: CGSize(width: 56, height: 32),
             buttonFont: .title3,
             verticalPadding: 6,
@@ -398,6 +414,7 @@ struct TrackRowContext {
         return TrackRowContext(
             showAddToQueue: false,
             showFavorite: false,
+            showDownload: false, // No download in queue
             thumbnailSize: CGSize(width: 40, height: 24),
             buttonFont: .system(size: 18),
             verticalPadding: 4,
@@ -410,5 +427,118 @@ struct TrackRowContext {
             removeButtonIcon: "minus.circle",
             removeButtonColor: .red
         )
+    }
+    
+    static func download(
+        isSelected: Bool,
+        isSelectionMode: Bool,
+        isCurrentTrack: Bool = false,
+        onPlay: @escaping () -> Void,
+        onToggleSelection: @escaping () -> Void
+    ) -> TrackRowContext {
+        let leadingElement: AnyView? = isSelectionMode ? AnyView(
+            Button(action: onToggleSelection) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? .blue : .secondary)
+                    .font(.system(size: 18))
+            }
+            .buttonStyle(.plain)
+        ) : nil
+        
+        return TrackRowContext(
+            showAddToQueue: true,
+            showFavorite: true,
+            showDownload: false, // Already downloaded
+            thumbnailSize: CGSize(width: 64, height: 36),
+            buttonFont: .title2,
+            verticalPadding: 8,
+            backgroundColor: isSelected ? Color.blue.opacity(0.1) : .clear,
+            cornerRadius: 8,
+            isCurrentTrack: isCurrentTrack,
+            leadingElement: leadingElement,
+            onPlay: onPlay,
+            onRemove: nil,
+            removeButtonIcon: "trash",
+            removeButtonColor: .red
+        )
+    }
+}
+
+// MARK: - Download Button Component
+
+struct DownloadButton: View {
+    let track: YTVideoInfo
+    @ObservedObject var downloadManager: MultiDownloadManager
+    
+    var body: some View {
+        Button(action: {
+            handleDownloadAction()
+        }) {
+            Group {
+                if let progress = downloadManager.activeDownloads[track.id] {
+                    // Show progress while downloading
+                    if progress.error != nil {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundColor(.orange)
+                    } else {
+                        ZStack {
+                            Circle()
+                                .stroke(Color.secondary.opacity(0.3), lineWidth: 2)
+                            Circle()
+                                .trim(from: 0, to: progress.progress)
+                                .stroke(Color.blue, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                            
+                            if progress.progress < 0.01 {
+                                ProgressView()
+                                    .scaleEffect(0.6)
+                            } else {
+                                Text("\(Int(progress.progress * 100))")
+                                    .font(.system(size: 8, weight: .medium))
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        .frame(width: 16, height: 16)
+                    }
+                } else if downloadManager.isDownloaded(track.id) {
+                    // Downloaded - show play from local file option
+                    Image(systemName: "play.circle.fill")
+                        .foregroundColor(.green)
+                } else {
+                    // Not downloaded
+                    Image(systemName: "arrow.down.circle")
+                        .foregroundColor(.blue)
+                }
+            }
+            .font(.system(size: 16))
+        }
+        .buttonStyle(.plain)
+        .disabled(downloadManager.isDownloading(track.id) && downloadManager.activeDownloads[track.id]?.error == nil)
+    }
+    
+    private func handleDownloadAction() {
+        if downloadManager.isDownloaded(track.id) {
+            // Already downloaded - play local file directly
+            if let localFilePath = downloadManager.findDownloadedFile(for: track.id) {
+                print("🚀 Playing downloaded track from download button: \(track.title)")
+                Task { @MainActor in
+                    await AudioManager.shared.playLocalFile(track: track, filePath: localFilePath)
+                }
+            } else {
+                print("❌ Track marked as downloaded but file not found: \(track.title)")
+            }
+        } else if downloadManager.isDownloading(track.id) {
+            // Cancel download
+            downloadManager.cancelDownload(for: track.id)
+        } else {
+            // Start download
+            Task { @MainActor in
+                do {
+                    try await downloadManager.downloadTrack(track)
+                } catch {
+                    print("Download failed: \(error)")
+                }
+            }
+        }
     }
 }

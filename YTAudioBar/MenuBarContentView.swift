@@ -59,12 +59,19 @@ struct MenuBarContentView: View {
                     }
                     .tag(2)
                 
+                DownloadsView(currentTrack: $currentTrack, audioManager: audioManager)
+                    .tabItem {
+                        Image(systemName: "arrow.down.circle")
+                        Text("Downloads")
+                    }
+                    .tag(3)
+                
                 SettingsView()
                     .tabItem {
                         Image(systemName: "gear")
                         Text("Settings")
                     }
-                    .tag(3)
+                    .tag(4)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.top, 12)
@@ -841,6 +848,7 @@ struct SettingsView: View {
     @State private var autoUpdateYTDLP = true
     @State private var showMiniPlayer = false
     @State private var darkMode = false
+    @StateObject private var notificationManager = NotificationManager.shared
     
     let audioQualities = ["best", "320", "256", "192", "128"]
     
@@ -891,6 +899,48 @@ struct SettingsView: View {
                             .font(.subheadline)
                         
                         Text("Keep a floating player window open for detailed controls")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                // Notification Settings
+                SettingsSection(title: "Notifications", icon: "bell") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Toggle("Enable Notifications", isOn: $notificationManager.isEnabled)
+                            .font(.subheadline)
+                            .onChange(of: notificationManager.isEnabled) { _, newValue in
+                                if newValue {
+                                    notificationManager.toggleEnabled()
+                                } else {
+                                    notificationManager.saveSettings()
+                                }
+                            }
+                        
+                        if notificationManager.isEnabled {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Toggle("Track Changes", isOn: $notificationManager.showTrackChange)
+                                    .font(.caption)
+                                    .onChange(of: notificationManager.showTrackChange) { _, _ in
+                                        notificationManager.saveSettings()
+                                    }
+                                
+                                Toggle("Download Complete", isOn: $notificationManager.showDownloadComplete)
+                                    .font(.caption)
+                                    .onChange(of: notificationManager.showDownloadComplete) { _, _ in
+                                        notificationManager.saveSettings()
+                                    }
+                                
+                                Toggle("Download Failed", isOn: $notificationManager.showDownloadFailed)
+                                    .font(.caption)
+                                    .onChange(of: notificationManager.showDownloadFailed) { _, _ in
+                                        notificationManager.saveSettings()
+                                    }
+                            }
+                            .padding(.leading, 16)
+                        }
+                        
+                        Text("Get notified about playback and download events")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
