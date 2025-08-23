@@ -76,12 +76,18 @@ YTAudioBar transforms your Mac's menu bar into a powerful YouTube audio player. 
 
 ### Building
 ```bash
-git clone https://github.com/yourusername/YTAudioBar-macos.git
+git clone https://github.com/ilyassan/YTAudioBar-macos.git
 cd YTAudioBar-macos
 open YTAudioBar.xcodeproj
 ```
 
-Build and run the project in Xcode by pressing `⌘R`.
+**Dependencies are downloaded automatically during build.** Simply press `⌘R` to build and run.
+
+#### Manual Setup (if needed)
+```bash
+# Download dependencies manually
+./Scripts/download-dependencies.sh
+```
 
 ## 🛠️ Technology Stack
 
