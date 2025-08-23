@@ -75,49 +75,21 @@ class FavoritesManager: ObservableObject {
     // MARK: - Track Management
     
     func addTrackToFavorites(_ videoInfo: YTVideoInfo) {
-        // Check if track already exists
-        let request: NSFetchRequest<Track> = Track.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@", videoInfo.id)
-        
-        do {
-            let existingTracks = try viewContext.fetch(request)
-            
-            if let existingTrack = existingTracks.first {
-                // Track exists, just mark as favorite
-                existingTrack.isFavorite = true
-            } else {
-                // Create new track
-                let newTrack = Track(context: viewContext)
-                newTrack.id = videoInfo.id
-                newTrack.title = videoInfo.title
-                newTrack.author = videoInfo.uploader
-                newTrack.duration = Int32(videoInfo.duration)
-                newTrack.thumbnailURL = videoInfo.thumbnailURL
-                newTrack.addedDate = Date()
-                newTrack.isFavorite = true
-                newTrack.isDownloaded = false
-                
-                // Add to "All Favorites" playlist by default
-                if let favoritesPlaylist = getFavoritesPlaylist() {
-                    newTrack.playlist = favoritesPlaylist
-                }
-            }
-            
-            try viewContext.save()
-            print("✅ Added to favorites: \(videoInfo.title)")
-            
-        } catch {
-            print("❌ Failed to add to favorites: \(error)")
+        guard let favoritesPlaylist = getFavoritesPlaylist() else {
+            print("❌ Favorites playlist not found")
+            return
         }
+        
+        addTrackToPlaylist(videoInfo, playlist: favoritesPlaylist, asFavorite: true)
     }
     
-    func addTrackToPlaylist(_ videoInfo: YTVideoInfo, playlist: Playlist) {
+    func addTrackToPlaylist(_ videoInfo: YTVideoInfo, playlist: Playlist, asFavorite: Bool = false) {
         // Check if track already exists
-        let request: NSFetchRequest<Track> = Track.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@", videoInfo.id)
+        let trackRequest: NSFetchRequest<Track> = Track.fetchRequest()
+        trackRequest.predicate = NSPredicate(format: "id == %@", videoInfo.id)
         
         do {
-            let existingTracks = try viewContext.fetch(request)
+            let existingTracks = try viewContext.fetch(trackRequest)
             
             let track: Track
             if let existingTrack = existingTracks.first {
@@ -131,23 +103,26 @@ class FavoritesManager: ObservableObject {
                 track.duration = Int32(videoInfo.duration)
                 track.thumbnailURL = videoInfo.thumbnailURL
                 track.addedDate = Date()
-                track.isFavorite = false
                 track.isDownloaded = false
             }
             
-            // Check if track is already in this playlist
-            if let currentPlaylist = track.playlist, currentPlaylist == playlist {
+            // Check if membership already exists
+            let membershipRequest: NSFetchRequest<PlaylistMembership> = PlaylistMembership.fetchRequest()
+            membershipRequest.predicate = NSPredicate(format: "track == %@ AND playlist == %@", track, playlist)
+            
+            let existingMemberships = try viewContext.fetch(membershipRequest)
+            if !existingMemberships.isEmpty {
                 print("⚠️ Track already in playlist: \(playlist.name ?? "Unknown")")
                 return
             }
             
-            // Add to playlist
-            track.playlist = playlist
-            
-            // Only mark as favorite if adding to the "All Favorites" system playlist
-            if playlist.name == "All Favorites" && playlist.isSystemPlaylist {
-                track.isFavorite = true
-            }
+            // Create new membership
+            let membership = PlaylistMembership(context: viewContext)
+            membership.id = UUID()
+            membership.addedDate = Date()
+            membership.track = track
+            membership.playlist = playlist
+            membership.isFavorite = asFavorite || (playlist.name == "All Favorites" && playlist.isSystemPlaylist)
             
             try viewContext.save()
             print("✅ Added to playlist '\(playlist.name ?? "Unknown")': \(videoInfo.title)")
@@ -157,40 +132,57 @@ class FavoritesManager: ObservableObject {
         }
     }
     
-    func removeTrackFromPlaylist(_ track: Track) {
-        // Find the track in our context to ensure we're working with the right object
-        let request: NSFetchRequest<Track> = Track.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@", track.id ?? "")
-        
+    func removeTrackFromPlaylist(_ track: Track, from playlist: Playlist? = nil) {
         do {
-            let foundTracks = try viewContext.fetch(request)
+            let membershipRequest: NSFetchRequest<PlaylistMembership> = PlaylistMembership.fetchRequest()
             
-            if let foundTrack = foundTracks.first {
-                // Clear playlist and favorite status
-                foundTrack.playlist = nil
-                foundTrack.isFavorite = false
-                
-                try viewContext.save()
-                viewContext.processPendingChanges()
-                
-                print("✅ Successfully removed track from favorites: \(track.title ?? "Unknown")")
+            if let specificPlaylist = playlist {
+                // Remove from specific playlist
+                membershipRequest.predicate = NSPredicate(format: "track.id == %@ AND playlist == %@", track.id ?? "", specificPlaylist)
             } else {
-                print("❌ Track not found in context!")
+                // Remove from favorites playlist (backward compatibility)
+                guard let favoritesPlaylist = getFavoritesPlaylist() else {
+                    print("❌ Favorites playlist not found")
+                    return
+                }
+                membershipRequest.predicate = NSPredicate(format: "track.id == %@ AND playlist == %@", track.id ?? "", favoritesPlaylist)
             }
+            
+            let memberships = try viewContext.fetch(membershipRequest)
+            
+            for membership in memberships {
+                viewContext.delete(membership)
+            }
+            
+            try viewContext.save()
+            viewContext.processPendingChanges()
+            
+            let playlistName = playlist?.name ?? "favorites"
+            print("✅ Successfully removed track from \(playlistName): \(track.title ?? "Unknown")")
+            
         } catch {
             print("❌ Failed to remove from playlist: \(error)")
         }
     }
     
-    func moveTrackToPlaylist(_ track: Track, to playlist: Playlist) {
-        track.playlist = playlist
+    func moveTrackToPlaylist(_ track: Track, from sourcePlaylist: Playlist, to targetPlaylist: Playlist) {
+        // Remove from source playlist
+        removeTrackFromPlaylist(track, from: sourcePlaylist)
         
-        do {
-            try viewContext.save()
-            print("✅ Moved to playlist '\(playlist.name ?? "Unknown")': \(track.title ?? "Unknown")")
-        } catch {
-            print("❌ Failed to move to playlist: \(error)")
-        }
+        // Add to target playlist
+        let videoInfo = YTVideoInfo(
+            id: track.id ?? "",
+            title: track.title ?? "Unknown",
+            uploader: track.author ?? "Unknown Artist",
+            duration: Int(track.duration),
+            thumbnailURL: track.thumbnailURL,
+            audioURL: nil,
+            description: nil
+        )
+        
+        addTrackToPlaylist(videoInfo, playlist: targetPlaylist)
+        
+        print("✅ Moved from '\(sourcePlaylist.name ?? "Unknown")' to '\(targetPlaylist.name ?? "Unknown")': \(track.title ?? "Unknown")")
     }
     
     // MARK: - Utility Functions
@@ -248,12 +240,13 @@ class FavoritesManager: ObservableObject {
     }
     
     func getTracksInPlaylist(_ playlist: Playlist) -> [Track] {
-        let request: NSFetchRequest<Track> = Track.fetchRequest()
-        request.predicate = NSPredicate(format: "playlist == %@", playlist)
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \Track.addedDate, ascending: false)]
+        let membershipRequest: NSFetchRequest<PlaylistMembership> = PlaylistMembership.fetchRequest()
+        membershipRequest.predicate = NSPredicate(format: "playlist == %@", playlist)
+        membershipRequest.sortDescriptors = [NSSortDescriptor(keyPath: \PlaylistMembership.addedDate, ascending: false)]
         
         do {
-            return try viewContext.fetch(request)
+            let memberships = try viewContext.fetch(membershipRequest)
+            return memberships.compactMap { $0.track }
         } catch {
             print("❌ Failed to fetch tracks in playlist: \(error)")
             return []
@@ -261,14 +254,34 @@ class FavoritesManager: ObservableObject {
     }
     
     func getAllFavorites() -> [Track] {
-        let request: NSFetchRequest<Track> = Track.fetchRequest()
-        request.predicate = NSPredicate(format: "isFavorite == YES")
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \Track.addedDate, ascending: false)]
+        guard let favoritesPlaylist = getFavoritesPlaylist() else {
+            return []
+        }
+        return getTracksInPlaylist(favoritesPlaylist)
+    }
+    
+    func isTrackInPlaylist(_ trackId: String, playlist: Playlist) -> Bool {
+        let membershipRequest: NSFetchRequest<PlaylistMembership> = PlaylistMembership.fetchRequest()
+        membershipRequest.predicate = NSPredicate(format: "track.id == %@ AND playlist == %@", trackId, playlist)
         
         do {
-            return try viewContext.fetch(request)
+            let count = try viewContext.count(for: membershipRequest)
+            return count > 0
         } catch {
-            print("❌ Failed to fetch all favorites: \(error)")
+            print("❌ Failed to check playlist membership: \(error)")
+            return false
+        }
+    }
+    
+    func getPlaylistsForTrack(_ trackId: String) -> [Playlist] {
+        let membershipRequest: NSFetchRequest<PlaylistMembership> = PlaylistMembership.fetchRequest()
+        membershipRequest.predicate = NSPredicate(format: "track.id == %@", trackId)
+        
+        do {
+            let memberships = try viewContext.fetch(membershipRequest)
+            return memberships.compactMap { $0.playlist }
+        } catch {
+            print("❌ Failed to fetch playlists for track: \(error)")
             return []
         }
     }

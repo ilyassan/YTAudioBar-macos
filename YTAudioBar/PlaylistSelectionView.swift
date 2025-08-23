@@ -178,7 +178,7 @@ struct CompactPlaylistRow: View {
                         .foregroundColor(.primary)
                         .lineLimit(1)
                     
-                    Text("\(playlist.tracks?.count ?? 0) tracks")
+                    Text("\(getTrackCountForPlaylist(playlist)) tracks")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
@@ -219,20 +219,27 @@ struct CompactPlaylistRow: View {
     
     private func checkIfTrackInPlaylist() {
         let context = PersistenceController.shared.container.viewContext
-        let request: NSFetchRequest<Track> = Track.fetchRequest()
-        
-        if playlist.name == "All Favorites" {
-            request.predicate = NSPredicate(format: "id == %@ AND isFavorite == YES", track.id)
-        } else {
-            request.predicate = NSPredicate(format: "id == %@ AND playlist == %@", track.id, playlist)
-        }
+        let request: NSFetchRequest<PlaylistMembership> = PlaylistMembership.fetchRequest()
+        request.predicate = NSPredicate(format: "track.id == %@ AND playlist == %@", track.id, playlist)
         
         do {
-            let existingTracks = try context.fetch(request)
-            isTrackInPlaylist = !existingTracks.isEmpty
+            let existingMemberships = try context.fetch(request)
+            isTrackInPlaylist = !existingMemberships.isEmpty
         } catch {
             print("Failed to check if track is in playlist: \(error)")
             isTrackInPlaylist = false
+        }
+    }
+    
+    private func getTrackCountForPlaylist(_ playlist: Playlist) -> Int {
+        let context = PersistenceController.shared.container.viewContext
+        let request: NSFetchRequest<PlaylistMembership> = PlaylistMembership.fetchRequest()
+        request.predicate = NSPredicate(format: "playlist == %@", playlist)
+        
+        do {
+            return try context.count(for: request)
+        } catch {
+            return 0
         }
     }
 }
@@ -356,15 +363,11 @@ struct SheetPlaylistRow: View {
     
     @State private var isTrackInPlaylist = false
     
-    // Real-time track count using @FetchRequest for "All Favorites"
-    @FetchRequest private var favoriteTracksCount: FetchedResults<Track>
+    // Real-time track count using @FetchRequest for playlist memberships
+    @FetchRequest private var membershipCount: FetchedResults<PlaylistMembership>
     
     var trackCount: Int {
-        if playlist.name == "All Favorites" {
-            return favoriteTracksCount.count
-        } else {
-            return playlist.tracks?.count ?? 0
-        }
+        return membershipCount.count
     }
     
     init(playlist: Playlist, track: YTVideoInfo, onSelected: @escaping () -> Void) {
@@ -372,19 +375,11 @@ struct SheetPlaylistRow: View {
         self.track = track
         self.onSelected = onSelected
         
-        // Set up real-time fetch request for favorites count
-        if playlist.name == "All Favorites" {
-            self._favoriteTracksCount = FetchRequest(
-                sortDescriptors: [],
-                predicate: NSPredicate(format: "isFavorite == YES")
-            )
-        } else {
-            // For non-favorite playlists, use empty fetch request (won't be used)
-            self._favoriteTracksCount = FetchRequest(
-                sortDescriptors: [],
-                predicate: NSPredicate(value: false)
-            )
-        }
+        // Set up real-time fetch request for membership count
+        self._membershipCount = FetchRequest(
+            sortDescriptors: [],
+            predicate: NSPredicate(format: "playlist == %@", playlist)
+        )
     }
     
     var body: some View {
@@ -445,20 +440,27 @@ struct SheetPlaylistRow: View {
     
     private func checkIfTrackInPlaylist() {
         let context = PersistenceController.shared.container.viewContext
-        let request: NSFetchRequest<Track> = Track.fetchRequest()
-        
-        if playlist.name == "All Favorites" {
-            request.predicate = NSPredicate(format: "id == %@ AND isFavorite == YES", track.id)
-        } else {
-            request.predicate = NSPredicate(format: "id == %@ AND playlist == %@", track.id, playlist)
-        }
+        let request: NSFetchRequest<PlaylistMembership> = PlaylistMembership.fetchRequest()
+        request.predicate = NSPredicate(format: "track.id == %@ AND playlist == %@", track.id, playlist)
         
         do {
-            let existingTracks = try context.fetch(request)
-            isTrackInPlaylist = !existingTracks.isEmpty
+            let existingMemberships = try context.fetch(request)
+            isTrackInPlaylist = !existingMemberships.isEmpty
         } catch {
             print("Failed to check if track is in playlist: \(error)")
             isTrackInPlaylist = false
+        }
+    }
+    
+    private func getTrackCountForPlaylist(_ playlist: Playlist) -> Int {
+        let context = PersistenceController.shared.container.viewContext
+        let request: NSFetchRequest<PlaylistMembership> = PlaylistMembership.fetchRequest()
+        request.predicate = NSPredicate(format: "playlist == %@", playlist)
+        
+        do {
+            return try context.count(for: request)
+        } catch {
+            return 0
         }
     }
 }

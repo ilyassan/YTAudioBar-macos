@@ -21,54 +21,128 @@ struct YTVideoInfo {
 class YTDLPManager: ObservableObject {
     static let shared = YTDLPManager()
     
-    private let ytdlpPath: String
+    var ytdlpPath: String // Make public for DownloadManager access
+    var ffmpegPath: String // Path to bundled ffmpeg
+    var ffprobePath: String // Path to bundled ffprobe
     private var downloadTasks: [String: Process] = [:]
     
     init() {
+        // Initialize with fallback values first to ensure all properties are set
+        ytdlpPath = "/usr/local/bin/yt-dlp"
+        ffmpegPath = "/usr/local/bin/ffmpeg"
+        ffprobePath = "/usr/local/bin/ffprobe"
+        
         // Try to find bundled yt-dlp binary first
         let bundle = Bundle.main
         let architecture = ProcessInfo.processInfo.machineHardwareName
         
-        var binaryName = "yt-dlp-arm64"
-        if architecture.contains("x86_64") {
-            binaryName = "yt-dlp-x86_64"
-        }
+        let ytdlpBinaryName = architecture.contains("x86_64") ? "yt-dlp-x86_64" : "yt-dlp-arm64"
+        let ffmpegBinaryName = architecture.contains("x86_64") ? "ffmpeg-x86_64" : "ffmpeg-arm64"
+        let ffprobeBinaryName = architecture.contains("x86_64") ? "ffprobe-x86_64" : "ffprobe-arm64"
         
-        // First try the Resources folder
+        // Initialize yt-dlp path
+        var foundYtdlp = false
+        
+        // First try the Resources folder for yt-dlp
         if let resourcePath = bundle.resourcePath {
-            let bundledPath = "\(resourcePath)/\(binaryName)"
+            let bundledPath = "\(resourcePath)/\(ytdlpBinaryName)"
             if FileManager.default.fileExists(atPath: bundledPath) {
                 ytdlpPath = bundledPath
                 print("Using bundled yt-dlp at path: \(ytdlpPath)")
-                return
+                foundYtdlp = true
             }
         }
         
-        // Try bundle.path method
-        if let path = bundle.path(forResource: binaryName, ofType: nil) {
+        // Try bundle.path method for yt-dlp
+        if !foundYtdlp, let path = bundle.path(forResource: ytdlpBinaryName, ofType: nil) {
             ytdlpPath = path
             print("Using bundled yt-dlp at path: \(ytdlpPath)")
-            return
+            foundYtdlp = true
         }
         
         // Check if system yt-dlp is available
-        let systemPaths = [
-            "/usr/local/bin/yt-dlp",
-            "/opt/homebrew/bin/yt-dlp",
-            "/usr/bin/yt-dlp"
-        ]
-        
-        for path in systemPaths {
-            if FileManager.default.fileExists(atPath: path) {
-                ytdlpPath = path
-                print("Using system yt-dlp at path: \(ytdlpPath)")
-                return
+        if !foundYtdlp {
+            let systemPaths = [
+                "/usr/local/bin/yt-dlp",
+                "/opt/homebrew/bin/yt-dlp",
+                "/usr/bin/yt-dlp"
+            ]
+            
+            for path in systemPaths {
+                if FileManager.default.fileExists(atPath: path) {
+                    ytdlpPath = path
+                    print("Using system yt-dlp at path: \(ytdlpPath)")
+                    foundYtdlp = true
+                    break
+                }
             }
         }
         
-        // Fallback - this will likely fail but we need a path
-        ytdlpPath = "/usr/local/bin/yt-dlp"
-        print("Warning: yt-dlp not found, using fallback path: \(ytdlpPath)")
+        // If not found, keep the fallback value already set
+        if !foundYtdlp {
+            print("Warning: yt-dlp not found, using fallback path: \(ytdlpPath)")
+        }
+        
+        // Initialize ffmpeg paths
+        var foundFFmpeg = false
+        
+        // Try to find bundled ffmpeg first
+        if let resourcePath = bundle.resourcePath {
+            let bundledFFmpegPath = "\(resourcePath)/\(ffmpegBinaryName)"
+            let bundledFFprobePath = "\(resourcePath)/\(ffprobeBinaryName)"
+            
+            if FileManager.default.fileExists(atPath: bundledFFmpegPath) &&
+               FileManager.default.fileExists(atPath: bundledFFprobePath) {
+                ffmpegPath = bundledFFmpegPath
+                ffprobePath = bundledFFprobePath
+                print("Using bundled ffmpeg at: \(ffmpegPath)")
+                print("Using bundled ffprobe at: \(ffprobePath)")
+                foundFFmpeg = true
+            }
+        }
+        
+        // Try bundle.path method for ffmpeg
+        if !foundFFmpeg,
+           let ffmpegPath = bundle.path(forResource: ffmpegBinaryName, ofType: nil),
+           let ffprobePath = bundle.path(forResource: ffprobeBinaryName, ofType: nil) {
+            self.ffmpegPath = ffmpegPath
+            self.ffprobePath = ffprobePath
+            print("Using bundled ffmpeg at: \(ffmpegPath)")
+            print("Using bundled ffprobe at: \(ffprobePath)")
+            foundFFmpeg = true
+        }
+        
+        // Check if system ffmpeg is available
+        if !foundFFmpeg {
+            let systemFFmpegPaths = [
+                "/usr/local/bin/ffmpeg",
+                "/opt/homebrew/bin/ffmpeg",
+                "/usr/bin/ffmpeg"
+            ]
+            
+            let systemFFprobePaths = [
+                "/usr/local/bin/ffprobe", 
+                "/opt/homebrew/bin/ffprobe",
+                "/usr/bin/ffprobe"
+            ]
+            
+            for (ffmpegPath, ffprobePath) in zip(systemFFmpegPaths, systemFFprobePaths) {
+                if FileManager.default.fileExists(atPath: ffmpegPath) &&
+                   FileManager.default.fileExists(atPath: ffprobePath) {
+                    self.ffmpegPath = ffmpegPath
+                    self.ffprobePath = ffprobePath
+                    print("Using system ffmpeg at: \(ffmpegPath)")
+                    print("Using system ffprobe at: \(ffprobePath)")
+                    foundFFmpeg = true
+                    break
+                }
+            }
+        }
+        
+        // If not found, keep the fallback values already set
+        if !foundFFmpeg {
+            print("Warning: ffmpeg/ffprobe not found, using fallback paths")
+        }
     }
     
     // MARK: - Search Functionality
@@ -339,6 +413,73 @@ class YTDLPManager: ObservableObject {
     func isAvailable() async -> Bool {
         let version = await getVersion()
         return version != nil
+    }
+    
+    // MARK: - Update Management
+    struct UpdateResult {
+        let hasUpdate: Bool
+        let currentVersion: String
+        let latestVersion: String
+    }
+    
+    func getCurrentVersion() async throws -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: self.ytdlpPath)
+        process.arguments = ["--version"]
+        
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        
+        try process.run()
+        process.waitUntilExit()
+        
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown"
+        
+        return output
+    }
+    
+    func checkForUpdates() async throws -> UpdateResult {
+        // Get current version
+        let currentVersion = try await getCurrentVersion()
+        
+        // Get latest version from GitHub API
+        guard let url = URL(string: "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest") else {
+            throw NSError(domain: "UpdateError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid API URL"])
+        }
+        
+        let (data, _) = try await URLSession.shared.data(from: url)
+        
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tagName = json["tag_name"] as? String else {
+            throw NSError(domain: "UpdateError", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid API response"])
+        }
+        
+        let latestVersion = tagName
+        let hasUpdate = currentVersion != latestVersion
+        
+        return UpdateResult(hasUpdate: hasUpdate, currentVersion: currentVersion, latestVersion: latestVersion)
+    }
+    
+    func updateYTDLP() async throws {
+        // Use yt-dlp's self-update functionality
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: self.ytdlpPath)
+        process.arguments = ["--update"]
+        
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        
+        try process.run()
+        process.waitUntilExit()
+        
+        if process.terminationStatus != 0 {
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let error = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw NSError(domain: "UpdateError", code: 3, userInfo: [NSLocalizedDescriptionKey: "Update failed: \(error)"])
+        }
     }
 }
 

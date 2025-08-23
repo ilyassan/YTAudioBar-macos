@@ -15,6 +15,13 @@ struct PersistenceController {
         let result = PersistenceController(inMemory: true)
         let viewContext = result.container.viewContext
         
+        // Create default playlist
+        let favoritesPlaylist = Playlist(context: viewContext)
+        favoritesPlaylist.id = UUID()
+        favoritesPlaylist.name = "All Favorites"
+        favoritesPlaylist.createdDate = Date()
+        favoritesPlaylist.isSystemPlaylist = true
+        
         // Create sample tracks
         let sampleTrack = Track(context: viewContext)
         sampleTrack.id = "sample_id"
@@ -22,14 +29,14 @@ struct PersistenceController {
         sampleTrack.author = "Sample Author"
         sampleTrack.duration = 180
         sampleTrack.addedDate = Date()
-        sampleTrack.isFavorite = true
         
-        // Create default playlist
-        let favoritesPlaylist = Playlist(context: viewContext)
-        favoritesPlaylist.id = UUID()
-        favoritesPlaylist.name = "Favorites"
-        favoritesPlaylist.createdDate = Date()
-        favoritesPlaylist.isSystemPlaylist = true
+        // Create membership to add track to favorites
+        let membership = PlaylistMembership(context: viewContext)
+        membership.id = UUID()
+        membership.addedDate = Date()
+        membership.track = sampleTrack
+        membership.playlist = favoritesPlaylist
+        membership.isFavorite = true
         
         // Create app settings
         let settings = AppSettings(context: viewContext)

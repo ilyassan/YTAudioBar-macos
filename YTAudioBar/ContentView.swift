@@ -63,7 +63,6 @@ struct ContentView: View {
             newTrack.author = "Sample Author"
             newTrack.duration = Int32.random(in: 120...300)
             newTrack.addedDate = Date()
-            newTrack.isFavorite = false
             newTrack.isDownloaded = false
 
             do {

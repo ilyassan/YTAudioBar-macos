@@ -1084,8 +1084,6 @@ struct SettingsView: View {
     @State private var defaultDownloadPath = "~/Music/YTAudioBar"
     @State private var preferredAudioQuality = "best"
     @State private var autoUpdateYTDLP = true
-    @State private var showMiniPlayer = false
-    @State private var darkMode = false
     @StateObject private var notificationManager = NotificationManager.shared
     
     let audioQualities = ["best", "320", "256", "192", "128"]
@@ -1127,18 +1125,6 @@ struct SettingsView: View {
                             .pickerStyle(.menu)
                             .frame(width: 140)
                         }
-                    }
-                }
-                
-                // Player Settings
-                SettingsSection(title: "Player", icon: "play.circle") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Toggle("Show Mini Player", isOn: $showMiniPlayer)
-                            .font(.subheadline)
-                        
-                        Text("Keep a floating player window open for detailed controls")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
                     }
                 }
                 
@@ -1184,50 +1170,6 @@ struct SettingsView: View {
                     }
                 }
                 
-                // Appearance Settings
-                SettingsSection(title: "Appearance", icon: "paintbrush") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Toggle("Dark Mode", isOn: $darkMode)
-                            .font(.subheadline)
-                        
-                        Text("Override system appearance setting")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                // Update Settings
-                SettingsSection(title: "Updates", icon: "arrow.triangle.2.circlepath") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Toggle("Auto-update yt-dlp", isOn: $autoUpdateYTDLP)
-                            .font(.subheadline)
-                        
-                        Text("Automatically update the YouTube downloader when new versions are available")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        Divider()
-                        
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("yt-dlp Version")
-                                    .font(.subheadline)
-                                Text("2024.01.01")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            Button("Check for Updates") {
-                                // TODO: Implement update check
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                        }
-                    }
-                }
-                
                 // About Section
                 SettingsSection(title: "About", icon: "info.circle") {
                     VStack(alignment: .leading, spacing: 12) {
@@ -1248,13 +1190,13 @@ struct SettingsView: View {
                         
                         HStack(spacing: 12) {
                             Button("GitHub") {
-                                // TODO: Open GitHub URL
+                                openURL("https://github.com/anthropics/ytaudiobar")
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                             
                             Button("Report Issue") {
-                                // TODO: Open issue reporting
+                                openURL("https://github.com/anthropics/ytaudiobar/issues")
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
@@ -1264,12 +1206,11 @@ struct SettingsView: View {
             }
             .padding(16)
         }
-        .onAppear(perform: loadSettings)
+        .onAppear {
+            loadSettings()
+        }
         .onChange(of: defaultDownloadPath) { _, _ in saveSettings() }
         .onChange(of: preferredAudioQuality) { _, _ in saveSettings() }
-        .onChange(of: autoUpdateYTDLP) { _, _ in saveSettings() }
-        .onChange(of: showMiniPlayer) { _, _ in saveSettings() }
-        .onChange(of: darkMode) { _, _ in saveSettings() }
     }
     
     private func chooseDownloadLocation() {
@@ -1292,9 +1233,6 @@ struct SettingsView: View {
             if let appSettings = settings.first {
                 defaultDownloadPath = appSettings.defaultDownloadPath ?? "~/Music/YTAudioBar"
                 preferredAudioQuality = appSettings.preferredAudioQuality ?? "best"
-                autoUpdateYTDLP = appSettings.autoUpdateYTDLP
-                showMiniPlayer = appSettings.showMiniPlayer
-                darkMode = appSettings.darkMode
             } else {
                 createDefaultSettings()
             }
@@ -1309,9 +1247,6 @@ struct SettingsView: View {
         settings.id = UUID()
         settings.defaultDownloadPath = defaultDownloadPath
         settings.preferredAudioQuality = preferredAudioQuality
-        settings.autoUpdateYTDLP = autoUpdateYTDLP
-        settings.showMiniPlayer = showMiniPlayer
-        settings.darkMode = darkMode
         
         saveContext()
     }
@@ -1329,9 +1264,6 @@ struct SettingsView: View {
             
             appSettings.defaultDownloadPath = defaultDownloadPath
             appSettings.preferredAudioQuality = preferredAudioQuality
-            appSettings.autoUpdateYTDLP = autoUpdateYTDLP
-            appSettings.showMiniPlayer = showMiniPlayer
-            appSettings.darkMode = darkMode
             
             saveContext()
         } catch {
@@ -1345,6 +1277,11 @@ struct SettingsView: View {
         } catch {
             print("Failed to save context: \(error)")
         }
+    }
+    
+    private func openURL(_ urlString: String) {
+        guard let url = URL(string: urlString) else { return }
+        NSWorkspace.shared.open(url)
     }
 }
 

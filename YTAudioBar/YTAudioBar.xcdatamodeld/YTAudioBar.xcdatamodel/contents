@@ -8,17 +8,25 @@
         <attribute name="thumbnailURL" optional="YES" attributeType="String"/>
         <attribute name="audioURL" optional="YES" attributeType="String"/>
         <attribute name="addedDate" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="isFavorite" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="isDownloaded" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="localPath" optional="YES" attributeType="String"/>
-        <relationship name="playlist" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Playlist" inverseName="tracks" inverseEntity="Playlist"/>
+        <relationship name="playlists" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Playlist" inverseName="tracks" inverseEntity="Playlist"/>
+        <relationship name="playlistMemberships" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="PlaylistMembership" inverseName="track" inverseEntity="PlaylistMembership"/>
     </entity>
     <entity name="Playlist" representedClassName="Playlist" syncable="YES" codeGenerationType="class">
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="name" attributeType="String"/>
         <attribute name="createdDate" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="isSystemPlaylist" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
-        <relationship name="tracks" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Track" inverseName="playlist" inverseEntity="Track"/>
+        <relationship name="tracks" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Track" inverseName="playlists" inverseEntity="Track"/>
+        <relationship name="memberships" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="PlaylistMembership" inverseName="playlist" inverseEntity="PlaylistMembership"/>
+    </entity>
+    <entity name="PlaylistMembership" representedClassName="PlaylistMembership" syncable="YES" codeGenerationType="class">
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="addedDate" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="isFavorite" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <relationship name="track" maxCount="1" deletionRule="Nullify" destinationEntity="Track" inverseName="playlistMemberships" inverseEntity="Track"/>
+        <relationship name="playlist" maxCount="1" deletionRule="Nullify" destinationEntity="Playlist" inverseName="memberships" inverseEntity="Playlist"/>
     </entity>
     <entity name="AppSettings" representedClassName="AppSettings" syncable="YES" codeGenerationType="class">
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
@@ -29,8 +37,9 @@
         <attribute name="darkMode" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
     </entity>
     <elements>
-        <element name="Track" positionX="-63" positionY="-18" width="128" height="209"/>
-        <element name="Playlist" positionX="144" positionY="-18" width="128" height="104"/>
+        <element name="Track" positionX="-63" positionY="-18" width="128" height="194"/>
+        <element name="Playlist" positionX="144" positionY="-18" width="128" height="119"/>
+        <element name="PlaylistMembership" positionX="351" positionY="-18" width="128" height="104"/>
         <element name="AppSettings" positionX="-63" positionY="225" width="128" height="119"/>
     </elements>
 </model>

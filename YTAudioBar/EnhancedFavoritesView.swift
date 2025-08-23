@@ -30,10 +30,10 @@ struct EnhancedFavoritesView: View {
         animation: .default)
     private var playlists: FetchedResults<Playlist>
     
-    // Fetch tracks for selected playlist
+    // Fetch tracks for selected playlist through memberships
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Track.addedDate, ascending: false)],
-        predicate: NSPredicate(format: "isFavorite == YES"), // Default predicate
+        predicate: NSPredicate(value: false), // Default empty predicate
         animation: .default)
     private var tracks: FetchedResults<Track>
     
@@ -213,12 +213,8 @@ struct EnhancedFavoritesView: View {
     private func updateTracksFilter() {
         guard let playlist = selectedPlaylist else { return }
         
-        // Update the fetch request predicate
-        if playlist.name == "All Favorites" {
-            tracks.nsPredicate = NSPredicate(format: "isFavorite == YES")
-        } else {
-            tracks.nsPredicate = NSPredicate(format: "playlist == %@", playlist)
-        }
+        // Update the fetch request predicate to use memberships
+        tracks.nsPredicate = NSPredicate(format: "ANY playlistMemberships.playlist == %@", playlist)
     }
     
     private func createNewPlaylist() {
@@ -252,7 +248,8 @@ struct EnhancedFavoritesView: View {
     
     private func removeTrackFromPlaylist(_ track: Track) {
         withAnimation(.easeInOut(duration: 0.25)) {
-            favoritesManager.removeTrackFromPlaylist(track)
+            guard let playlist = selectedPlaylist else { return }
+            favoritesManager.removeTrackFromPlaylist(track, from: playlist)
         }
     }
 }
@@ -263,15 +260,11 @@ struct PlaylistRow: View {
     let onSelect: () -> Void
     let onShowOptions: () -> Void
     
-    // Real-time track count using @FetchRequest for "All Favorites"
-    @FetchRequest private var favoriteTracksCount: FetchedResults<Track>
+    // Real-time track count using @FetchRequest for playlist memberships
+    @FetchRequest private var membershipCount: FetchedResults<PlaylistMembership>
     
     var trackCount: Int {
-        if playlist.name == "All Favorites" {
-            return favoriteTracksCount.count
-        } else {
-            return playlist.tracks?.count ?? 0
-        }
+        return membershipCount.count
     }
     
     init(playlist: Playlist, isSelected: Bool, onSelect: @escaping () -> Void, onShowOptions: @escaping () -> Void) {
@@ -280,19 +273,11 @@ struct PlaylistRow: View {
         self.onSelect = onSelect
         self.onShowOptions = onShowOptions
         
-        // Set up real-time fetch request for favorites count
-        if playlist.name == "All Favorites" {
-            self._favoriteTracksCount = FetchRequest(
-                sortDescriptors: [],
-                predicate: NSPredicate(format: "isFavorite == YES")
-            )
-        } else {
-            // For non-favorite playlists, use empty fetch request (won't be used)
-            self._favoriteTracksCount = FetchRequest(
-                sortDescriptors: [],
-                predicate: NSPredicate(value: false)
-            )
-        }
+        // Set up real-time fetch request for membership count
+        self._membershipCount = FetchRequest(
+            sortDescriptors: [],
+            predicate: NSPredicate(format: "playlist == %@", playlist)
+        )
     }
     
     var body: some View {

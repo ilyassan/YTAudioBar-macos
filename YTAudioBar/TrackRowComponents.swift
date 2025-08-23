@@ -118,7 +118,7 @@ struct UnifiedTrackRow: View {
     
     private func checkIfFavorite() {
         let request: NSFetchRequest<Track> = Track.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@ AND isFavorite == YES", track.id)
+        request.predicate = NSPredicate(format: "id == %@ AND ANY playlistMemberships.playlist.name == %@ AND ANY playlistMemberships.playlist.isSystemPlaylist == YES", track.id, "All Favorites")
         
         do {
             let existingTracks = try viewContext.fetch(request)
@@ -408,7 +408,15 @@ struct TrackRowContext {
             )
         } else {
             leadingElement = AnyView(
-                Text("\(index + 1)")
+                HStack(spacing: 4) {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary.opacity(0.7))
+                    
+                    Text("\(index + 1)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
                     .font(.caption)
                     .foregroundColor(.secondary)
             )
