@@ -75,19 +75,31 @@ YTAudioBar transforms your Mac's menu bar into a powerful YouTube audio player. 
 - macOS 13.0 SDK or later
 
 ### Building
+
+#### Quick Start (Recommended)
 ```bash
 git clone https://github.com/ilyassan/YTAudioBar-macos.git
 cd YTAudioBar-macos
+
+# Download dependencies first (required for app to work)
+./Scripts/download-dependencies.sh
+
+# Open and build in Xcode
 open YTAudioBar.xcodeproj
 ```
 
-**Dependencies are downloaded automatically during build.** Simply press `⌘R` to build and run.
+Press `⌘R` in Xcode to build and run the app.
 
-#### Manual Setup (if needed)
-```bash
-# Download dependencies manually
-./Scripts/download-dependencies.sh
-```
+#### What the script does:
+- Downloads `yt-dlp` binary for YouTube integration
+- Downloads `ffmpeg` binary for audio processing  
+- Places binaries in `YTAudioBar/Resources/` (ignored by Git)
+- Validates downloads and sets proper permissions
+
+#### Troubleshooting
+- **"No such file or directory" errors**: Run the download script first
+- **Permission denied**: Make sure script is executable (`chmod +x Scripts/download-dependencies.sh`)
+- **Download fails**: Check internet connection and try again
 
 ## 🛠️ Technology Stack
 
