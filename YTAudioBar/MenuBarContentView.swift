@@ -1197,6 +1197,11 @@ struct SettingsView: View {
                     }
                 }
                 
+                // App Updates Section
+                SettingsSection(title: "App Updates", icon: "arrow.triangle.2.circlepath") {
+                    AppUpdateSettingsView()
+                }
+                
                 // About Section
                 SettingsSection(title: "About", icon: "info.circle") {
                     VStack(alignment: .leading, spacing: 12) {

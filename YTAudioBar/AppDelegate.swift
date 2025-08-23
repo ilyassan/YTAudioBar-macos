@@ -39,6 +39,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Check dependencies and show setup UI if needed
         checkDependenciesAndSetup()
         
+        // Check for app updates automatically
+        checkForAppUpdates()
+        
         // Create the popover
         popover = NSPopover()
         popover.contentSize = NSSize(width: 420, height: 520)
@@ -175,6 +178,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             
             // Keep the window alive
             window.delegate = self
+        }
+    }
+    
+    private func checkForAppUpdates() {
+        Task {
+            // Check for app updates silently
+            await AppUpdater.shared.checkForUpdates(silent: true)
         }
     }
     
