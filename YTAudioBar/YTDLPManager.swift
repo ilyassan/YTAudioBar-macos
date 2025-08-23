@@ -27,41 +27,16 @@ class YTDLPManager: ObservableObject {
     private var downloadTasks: [String: Process] = [:]
     
     init() {
-        // Initialize with fallback values first to ensure all properties are set
-        ytdlpPath = "/usr/local/bin/yt-dlp"
-        ffmpegPath = "/usr/local/bin/ffmpeg"
-        ffprobePath = "/usr/local/bin/ffprobe"
+        // Use DependencyManager for runtime dependencies
+        let dependencyManager = DependencyManager.shared
         
-        // Try to find bundled yt-dlp binary first
-        let bundle = Bundle.main
-        let architecture = ProcessInfo.processInfo.machineHardwareName
+        // Set paths from DependencyManager
+        ytdlpPath = dependencyManager.ytdlpPath
+        ffmpegPath = dependencyManager.ffmpegPath
+        ffprobePath = dependencyManager.ffmpegPath // ffprobe not needed for our use case
         
-        let ytdlpBinaryName = architecture.contains("x86_64") ? "yt-dlp-x86_64" : "yt-dlp-arm64"
-        let ffmpegBinaryName = architecture.contains("x86_64") ? "ffmpeg-x86_64" : "ffmpeg-arm64"
-        let ffprobeBinaryName = architecture.contains("x86_64") ? "ffprobe-x86_64" : "ffprobe-arm64"
-        
-        // Initialize yt-dlp path
-        var foundYtdlp = false
-        
-        // First try the Resources folder for yt-dlp
-        if let resourcePath = bundle.resourcePath {
-            let bundledPath = "\(resourcePath)/\(ytdlpBinaryName)"
-            if FileManager.default.fileExists(atPath: bundledPath) {
-                ytdlpPath = bundledPath
-                print("Using bundled yt-dlp at path: \(ytdlpPath)")
-                foundYtdlp = true
-            }
-        }
-        
-        // Try bundle.path method for yt-dlp
-        if !foundYtdlp, let path = bundle.path(forResource: ytdlpBinaryName, ofType: nil) {
-            ytdlpPath = path
-            print("Using bundled yt-dlp at path: \(ytdlpPath)")
-            foundYtdlp = true
-        }
-        
-        // Check if system yt-dlp is available
-        if !foundYtdlp {
+        // Fallback to system paths if dependencies don't exist
+        if !FileManager.default.fileExists(atPath: ytdlpPath) {
             let systemPaths = [
                 "/usr/local/bin/yt-dlp",
                 "/opt/homebrew/bin/yt-dlp",
@@ -71,78 +46,29 @@ class YTDLPManager: ObservableObject {
             for path in systemPaths {
                 if FileManager.default.fileExists(atPath: path) {
                     ytdlpPath = path
-                    print("Using system yt-dlp at path: \(ytdlpPath)")
-                    foundYtdlp = true
                     break
                 }
             }
         }
         
-        // If not found, keep the fallback value already set
-        if !foundYtdlp {
-            print("Warning: yt-dlp not found, using fallback path: \(ytdlpPath)")
-        }
-        
-        // Initialize ffmpeg paths
-        var foundFFmpeg = false
-        
-        // Try to find bundled ffmpeg first
-        if let resourcePath = bundle.resourcePath {
-            let bundledFFmpegPath = "\(resourcePath)/\(ffmpegBinaryName)"
-            let bundledFFprobePath = "\(resourcePath)/\(ffprobeBinaryName)"
-            
-            if FileManager.default.fileExists(atPath: bundledFFmpegPath) &&
-               FileManager.default.fileExists(atPath: bundledFFprobePath) {
-                ffmpegPath = bundledFFmpegPath
-                ffprobePath = bundledFFprobePath
-                print("Using bundled ffmpeg at: \(ffmpegPath)")
-                print("Using bundled ffprobe at: \(ffprobePath)")
-                foundFFmpeg = true
-            }
-        }
-        
-        // Try bundle.path method for ffmpeg
-        if !foundFFmpeg,
-           let ffmpegPath = bundle.path(forResource: ffmpegBinaryName, ofType: nil),
-           let ffprobePath = bundle.path(forResource: ffprobeBinaryName, ofType: nil) {
-            self.ffmpegPath = ffmpegPath
-            self.ffprobePath = ffprobePath
-            print("Using bundled ffmpeg at: \(ffmpegPath)")
-            print("Using bundled ffprobe at: \(ffprobePath)")
-            foundFFmpeg = true
-        }
-        
-        // Check if system ffmpeg is available
-        if !foundFFmpeg {
-            let systemFFmpegPaths = [
+        if !FileManager.default.fileExists(atPath: ffmpegPath) {
+            let systemPaths = [
                 "/usr/local/bin/ffmpeg",
                 "/opt/homebrew/bin/ffmpeg",
                 "/usr/bin/ffmpeg"
             ]
             
-            let systemFFprobePaths = [
-                "/usr/local/bin/ffprobe", 
-                "/opt/homebrew/bin/ffprobe",
-                "/usr/bin/ffprobe"
-            ]
-            
-            for (ffmpegPath, ffprobePath) in zip(systemFFmpegPaths, systemFFprobePaths) {
-                if FileManager.default.fileExists(atPath: ffmpegPath) &&
-                   FileManager.default.fileExists(atPath: ffprobePath) {
-                    self.ffmpegPath = ffmpegPath
-                    self.ffprobePath = ffprobePath
-                    print("Using system ffmpeg at: \(ffmpegPath)")
-                    print("Using system ffprobe at: \(ffprobePath)")
-                    foundFFmpeg = true
+            for path in systemPaths {
+                if FileManager.default.fileExists(atPath: path) {
+                    ffmpegPath = path
+                    ffprobePath = path.replacingOccurrences(of: "ffmpeg", with: "ffprobe")
                     break
                 }
             }
         }
         
-        // If not found, keep the fallback values already set
-        if !foundFFmpeg {
-            print("Warning: ffmpeg/ffprobe not found, using fallback paths")
-        }
+        print("YTDLPManager using yt-dlp at: \(ytdlpPath)")
+        print("YTDLPManager using ffmpeg at: \(ffmpegPath)")
     }
     
     // MARK: - Search Functionality

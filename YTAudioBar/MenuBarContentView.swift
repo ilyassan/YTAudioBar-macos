@@ -560,6 +560,8 @@ struct SearchResultsView: View {
     @State private var errorMessage: String?
     @State private var searchTask: Task<Void, Never>?
     @StateObject private var ytdlpManager = YTDLPManager.shared
+    @StateObject private var dependencyManager = DependencyManager.shared
+    @State private var showDependencySetup = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -569,13 +571,16 @@ struct SearchResultsView: View {
                 if isSearching {
                     LoadingSearchView(searchText: searchText)
                 } else if let error = errorMessage {
-                    ErrorSearchView(error: error) {
+                    ErrorSearchView(error: error, dependencyManager: dependencyManager, showDependencySetup: $showDependencySetup) {
                         retrySearch()
                     }
                 } else {
                     SearchResultsList(results: searchResults, currentTrack: $currentTrack, audioManager: audioManager)
                 }
             }
+        }
+        .sheet(isPresented: $showDependencySetup) {
+            DependencySetupView(isPresented: $showDependencySetup)
         }
         .onChange(of: searchText) { _, newValue in
             // Cancel any existing search task
@@ -640,6 +645,18 @@ struct SearchResultsView: View {
     
     private func performSearchTask() async {
         guard !searchText.isEmpty else { return }
+        
+        // Check if dependencies are missing
+        if !dependencyManager.allDependenciesExist {
+            await MainActor.run {
+                if !Task.isCancelled {
+                    self.errorMessage = "Dependencies not found. Please download required components to use search functionality."
+                    self.searchResults = []
+                    self.isSearching = false
+                }
+            }
+            return
+        }
         
         do {
             let results = try await ytdlpManager.search(query: searchText, musicMode: isMusicMode)
@@ -710,6 +727,8 @@ struct LoadingSearchView: View {
 
 struct ErrorSearchView: View {
     let error: String
+    @ObservedObject var dependencyManager: DependencyManager
+    @Binding var showDependencySetup: Bool
     let onRetry: () -> Void
     
     var body: some View {
@@ -730,10 +749,18 @@ struct ErrorSearchView: View {
                     .padding(.horizontal)
             }
             
-            Button("Try Again") {
-                onRetry()
+            // Show different buttons based on error type
+            if !dependencyManager.allDependenciesExist {
+                Button("Download Dependencies") {
+                    showDependencySetup = true
+                }
+                .buttonStyle(.borderedProminent)
+            } else {
+                Button("Try Again") {
+                    onRetry()
+                }
+                .buttonStyle(.bordered)
             }
-            .buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()

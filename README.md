@@ -44,6 +44,7 @@ YTAudioBar transforms your Mac's menu bar into a powerful YouTube audio player. 
 - Infinite scrolling track titles
 
 ### 🔧 Smart Features
+- **Runtime dependency downloads** - No large app bundle
 - Automatic yt-dlp updates
 - System notifications for downloads/playback
 - Configurable download locations
@@ -60,12 +61,14 @@ YTAudioBar transforms your Mac's menu bar into a powerful YouTube audio player. 
 2. Open the downloaded `.dmg` file
 3. Drag `YTAudioBar.app` to your `Applications` folder
 4. Launch YTAudioBar from Applications or Spotlight
-5. Grant necessary permissions when prompted
+5. **First launch** - Download required dependencies (yt-dlp + ffmpeg)
+6. Grant necessary permissions when prompted
 
 ### System Requirements
 - **macOS 13.0** or later
-- **~50MB** free disk space
-- **Internet connection** for streaming
+- **~15MB** free disk space (app bundle)
+- **~95MB** additional for dependencies (downloaded on first launch)
+- **Internet connection** for streaming and setup
 
 ## 🚀 Build from Source
 
@@ -81,25 +84,28 @@ YTAudioBar transforms your Mac's menu bar into a powerful YouTube audio player. 
 git clone https://github.com/ilyassan/YTAudioBar-macos.git
 cd YTAudioBar-macos
 
-# Download dependencies first (required for app to work)
-./Scripts/download-dependencies.sh
-
 # Open and build in Xcode
 open YTAudioBar.xcodeproj
 ```
 
 Press `⌘R` in Xcode to build and run the app.
 
-#### What the script does:
-- Downloads `yt-dlp` binary for YouTube integration
-- Downloads `ffmpeg` binary for audio processing  
-- Places binaries in `YTAudioBar/Resources/` (ignored by Git)
-- Validates downloads and sets proper permissions
+#### Dependencies
+YTAudioBar uses a **runtime dependency system** that downloads required components on first launch:
+
+- **yt-dlp** (~35MB) - YouTube integration and streaming
+- **ffmpeg** (~60MB) - Audio processing and downloads
+
+This approach:
+- ✅ Keeps the app bundle small (~15MB)
+- ✅ Always uses the latest dependency versions
+- ✅ Reduces repository size and complexity
+- ✅ Professional macOS app standard
 
 #### Troubleshooting
-- **"No such file or directory" errors**: Run the download script first
-- **Permission denied**: Make sure script is executable (`chmod +x Scripts/download-dependencies.sh`)
-- **Download fails**: Check internet connection and try again
+- **Search not working**: Dependencies will be automatically downloaded on first launch
+- **Build issues**: Clean build folder (`⌘⇧K`) and retry
+- **Permission errors**: Grant network access when prompted
 
 ## 🛠️ Technology Stack
 

@@ -9,7 +9,7 @@ import Cocoa
 import SwiftUI
 import Combine
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var statusBar: NSStatusBar!
     var statusBarItem: NSStatusItem!
     var popover: NSPopover!
@@ -36,8 +36,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Listen to audio manager state changes
         setupAudioManagerObservers()
         
-        // Perform automatic yt-dlp update check (silent)
-        performAutomaticYTDLPUpdate()
+        // Check dependencies and show setup UI if needed
+        checkDependenciesAndSetup()
         
         // Create the popover
         popover = NSPopover()
@@ -140,11 +140,50 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    // MARK: - Automatic yt-dlp Updates
+    // MARK: - Dependency Management
+    
+    private func checkDependenciesAndSetup() {
+        let dependencyManager = DependencyManager.shared
+        
+        // If dependencies don't exist, show setup window
+        if !dependencyManager.allDependenciesExist {
+            showDependencySetupWindow()
+        } else {
+            // Dependencies exist, perform silent update check
+            performAutomaticYTDLPUpdate()
+        }
+    }
+    
+    private func showDependencySetupWindow() {
+        DispatchQueue.main.async {
+            let setupView = DependencySetupView(isPresented: .constant(true))
+            let hostingController = NSHostingController(rootView: setupView)
+            
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 500, height: 400),
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            
+            window.center()
+            window.title = "YTAudioBar Setup"
+            window.contentViewController = hostingController
+            window.isReleasedWhenClosed = false
+            window.level = .floating
+            window.makeKeyAndOrderFront(nil)
+            
+            // Keep the window alive
+            window.delegate = self
+        }
+    }
     
     private func performAutomaticYTDLPUpdate() {
         Task {
             do {
+                // Only update if dependencies exist
+                guard DependencyManager.shared.allDependenciesExist else { return }
+                
                 // Check for updates silently
                 let result = try await YTDLPManager.shared.checkForUpdates()
                 
