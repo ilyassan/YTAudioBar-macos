@@ -1,0 +1,97 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build and Test on macOS
+    runs-on: macos-latest
+    
+    strategy:
+      matrix:
+        xcode: ['15.0']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Select Xcode version
+      run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
+      
+    - name: Show Xcode version
+      run: xcodebuild -version
+      
+    - name: Show available SDKs
+      run: xcodebuild -showsdks
+      
+    - name: Install dependencies
+      run: |
+        # Create a temporary directory for dependencies
+        mkdir -p temp_deps
+        cd temp_deps
+        
+        # Download yt-dlp for testing (we need it for build verification)
+        curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o yt-dlp-universal
+        chmod +x yt-dlp-universal
+        
+        # Download ffmpeg binaries (for testing, not included in final build)
+        curl -L https://github.com/eugeneware/ffmpeg-static/releases/latest/download/darwin-x64 -o ffmpeg-x86_64 2>/dev/null || echo "ffmpeg download failed (expected)"
+        curl -L https://www.osxexperts.net/ffmpeg-arm64.zip -o ffmpeg-arm64.zip 2>/dev/null || echo "ffmpeg arm64 download failed (expected)"
+        
+        cd ..
+        
+    - name: Build project (Debug)
+      run: |
+        xcodebuild build \
+          -project YTAudioBar.xcodeproj \
+          -scheme YTAudioBar \
+          -configuration Debug \
+          -destination "platform=macOS" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGN_IDENTITY="" \
+          PROVISIONING_PROFILE="" \
+          | xcpretty || true
+          
+    - name: Build project (Release)
+      run: |
+        xcodebuild build \
+          -project YTAudioBar.xcodeproj \
+          -scheme YTAudioBar \
+          -configuration Release \
+          -destination "platform=macOS" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGN_IDENTITY="" \
+          PROVISIONING_PROFILE="" \
+          | xcpretty || true
+          
+    - name: Archive project
+      run: |
+        xcodebuild archive \
+          -project YTAudioBar.xcodeproj \
+          -scheme YTAudioBar \
+          -configuration Release \
+          -destination "platform=macOS" \
+          -archivePath build/YTAudioBar.xcarchive \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGN_IDENTITY="" \
+          PROVISIONING_PROFILE="" \
+          | xcpretty || true
+          
+    - name: Check if app was built
+      run: |
+        if [ -d "build/YTAudioBar.xcarchive" ]; then
+          echo "✅ Archive created successfully"
+          ls -la build/YTAudioBar.xcarchive
+        else
+          echo "❌ Archive was not created"
+          exit 1
+        fi
+        
+    - name: Clean up
+      run: |
+        rm -rf temp_deps
+        rm -rf build

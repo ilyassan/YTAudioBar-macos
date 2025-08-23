@@ -1,0 +1,135 @@
+name: Performance Issue
+description: Report performance problems or optimization suggestions
+title: "[Performance]: "
+labels: ["performance", "needs-triage"]
+assignees:
+  - ilyassan
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Performance issues can significantly impact user experience. Please provide detailed information to help us identify and resolve the problem.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What version of YTAudioBar are you running?
+      placeholder: "v1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: macos-version
+    attributes:
+      label: macOS Version
+      description: What version of macOS are you running?
+      options:
+        - macOS 15.0 (Sequoia)
+        - macOS 14.0 (Sonoma)
+        - macOS 13.0 (Ventura)
+        - macOS 12.0 (Monterey)
+        - Other (specify in description)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: chip
+    attributes:
+      label: Mac Chip
+      description: What Mac chip are you using?
+      options:
+        - Apple Silicon (M1/M2/M3/M4)
+        - Intel
+        - Unsure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Performance Issue Type
+      description: What type of performance issue are you experiencing?
+      options:
+        - High CPU usage
+        - High memory usage
+        - Battery drain
+        - Slow app launch
+        - Slow audio streaming
+        - UI lag/freezing
+        - Audio stuttering/glitches
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Performance Issue Description
+      description: Describe the performance issue in detail
+      placeholder: "The app uses 50% CPU when playing audio..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: when-occurs
+    attributes:
+      label: When does this occur?
+      description: When do you notice the performance issue?
+      placeholder: "During audio playback, when searching, after running for X hours..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: system-specs
+    attributes:
+      label: System Specifications
+      description: Provide relevant system information
+      placeholder: |
+        - RAM: 16GB
+        - Storage: 512GB SSD (50% full)
+        - Other running apps: Chrome, Slack, etc.
+    validations:
+      required: false
+
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this performance issue?
+      placeholder: |
+        1. Open YTAudioBar
+        2. Play audio for 30 minutes
+        3. Check Activity Monitor
+        4. Notice high CPU usage
+    validations:
+      required: true
+
+  - type: textarea
+    id: metrics
+    attributes:
+      label: Performance Metrics (if available)
+      description: Any specific metrics from Activity Monitor, Console, or other tools
+      render: shell
+
+  - type: textarea
+    id: expected-performance
+    attributes:
+      label: Expected Performance
+      description: What performance would you expect?
+      placeholder: "Should use less than 10% CPU during playback..."
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Any other context about the performance issue
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/ilyassan/YTAudioBar-macos/blob/main/CODE_OF_CONDUCT.md)
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true

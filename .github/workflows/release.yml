@@ -1,0 +1,145 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Select Xcode version
+      run: sudo xcode-select -s /Applications/Xcode_15.0.app/Contents/Developer
+      
+    - name: Show build environment
+      run: |
+        xcodebuild -version
+        sw_vers
+        
+    - name: Install create-dmg
+      run: brew install create-dmg
+      
+    - name: Get version from tag
+      id: get_version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        
+    - name: Archive and export app
+      run: |
+        # Archive the app
+        xcodebuild archive \
+          -project YTAudioBar.xcodeproj \
+          -scheme YTAudioBar \
+          -configuration Release \
+          -destination "platform=macOS" \
+          -archivePath build/YTAudioBar.xcarchive \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGN_IDENTITY="" \
+          PROVISIONING_PROFILE=""
+          
+        # Export the app
+        xcodebuild -exportArchive \
+          -archivePath build/YTAudioBar.xcarchive \
+          -exportPath build/export \
+          -exportOptionsPlist .github/workflows/ExportOptions.plist
+          
+    - name: Create ExportOptions.plist
+      run: |
+        mkdir -p .github/workflows
+        cat > .github/workflows/ExportOptions.plist << EOF
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>method</key>
+            <string>mac-application</string>
+            <key>destination</key>
+            <string>export</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+        </dict>
+        </plist>
+        EOF
+        
+    - name: Create DMG
+      run: |
+        # Create DMG with custom background and layout
+        create-dmg \
+          --volname "YTAudioBar ${{ steps.get_version.outputs.version }}" \
+          --volicon "YTAudioBar/Assets.xcassets/AppIcon.appiconset/icon_512x512.png" \
+          --window-pos 200 120 \
+          --window-size 800 450 \
+          --icon-size 100 \
+          --icon "YTAudioBar.app" 200 190 \
+          --hide-extension "YTAudioBar.app" \
+          --app-drop-link 600 185 \
+          "YTAudioBar-${{ steps.get_version.outputs.version }}.dmg" \
+          "build/export/"
+          
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        cat > release_notes.md << 'EOF'
+        ## YTAudioBar ${{ steps.get_version.outputs.version }}
+        
+        ### 🎵 What's New
+        
+        <!-- Add your release notes here -->
+        
+        ### 📋 System Requirements
+        
+        - **macOS**: 13.0 (Ventura) or later
+        - **Architecture**: Intel and Apple Silicon Macs supported
+        - **Dependencies**: Automatically downloaded on first launch
+        
+        ### 📥 Installation
+        
+        1. Download `YTAudioBar-${{ steps.get_version.outputs.version }}.dmg`
+        2. Open the DMG file
+        3. Drag YTAudioBar to Applications folder
+        4. Launch YTAudioBar from Applications
+        5. Allow dependencies to download on first launch
+        
+        ### 🔄 Updating
+        
+        YTAudioBar includes automatic update checking. You'll be notified when new versions are available.
+        
+        ### 🐛 Known Issues
+        
+        - First launch may take a moment while dependencies download
+        - Some YouTube videos may not be available due to regional restrictions
+        
+        ---
+        
+        **Full Changelog**: https://github.com/ilyassan/YTAudioBar-macos/compare/${{ steps.get_version.outputs.tag }}...HEAD
+        EOF
+        
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          YTAudioBar-${{ steps.get_version.outputs.version }}.dmg
+        name: YTAudioBar ${{ steps.get_version.outputs.version }}
+        body_path: release_notes.md
+        draft: true
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: YTAudioBar-${{ steps.get_version.outputs.version }}
+        path: |
+          YTAudioBar-${{ steps.get_version.outputs.version }}.dmg
+          build/YTAudioBar.xcarchive
