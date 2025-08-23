@@ -1190,13 +1190,13 @@ struct SettingsView: View {
                         
                         HStack(spacing: 12) {
                             Button("GitHub") {
-                                openURL("https://github.com/anthropics/ytaudiobar")
+                                openURL("https://github.com/ilyassan/YTAudioBar-macos")
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                             
                             Button("Report Issue") {
-                                openURL("https://github.com/anthropics/ytaudiobar/issues")
+                                openURL("https://github.com/ilyassan/YTAudioBar-macos/issues")
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
