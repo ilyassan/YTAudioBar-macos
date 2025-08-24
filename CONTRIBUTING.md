@@ -5,7 +5,7 @@ Thank you for your interest in contributing to YTAudioBar! This document provide
 ## 🚀 Getting Started
 
 ### Prerequisites
-- **macOS**: 13.0 (Ventura) or later
+- **macOS**: 14.0 (Sonoma) or later
 - **Xcode**: 15.0 or later
 - **Git**: Latest version
 - **GitHub account**: For submitting contributions
