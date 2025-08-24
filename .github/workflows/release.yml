@@ -24,8 +24,10 @@ jobs:
         xcodebuild -version
         sw_vers
         
-    - name: Install create-dmg
-      run: brew install create-dmg
+    - name: Install create-dmg and GraphicsMagick
+      run: |
+        brew install create-dmg
+        brew install graphicsmagick
       
     - name: Get version from tag
       id: get_version
@@ -73,20 +75,15 @@ jobs:
         </plist>
         EOF
         
-    - name: Create DMG
+    - name: Prepare dependencies for DMG creation
       run: |
-        # Create DMG with custom background and layout
-        create-dmg \
-          --volname "YTAudioBar ${{ steps.get_version.outputs.version }}" \
-          --volicon "YTAudioBar/Assets.xcassets/AppIcon.appiconset/icon_512x512.png" \
-          --window-pos 200 120 \
-          --window-size 800 450 \
-          --icon-size 100 \
-          --icon "YTAudioBar.app" 200 190 \
-          --hide-extension "YTAudioBar.app" \
-          --app-drop-link 600 185 \
-          "YTAudioBar-${{ steps.get_version.outputs.version }}.dmg" \
-          "build/export/"
+        # Install Pillow for background image generation
+        pip3 install Pillow --break-system-packages
+        
+    - name: Create Professional DMG
+      run: |
+        # Use our professional DMG creation script
+        ./create_professional_dmg.sh ${{ steps.get_version.outputs.version }}
           
     - name: Generate release notes
       id: release_notes
