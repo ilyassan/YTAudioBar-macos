@@ -18,12 +18,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-13
-            os-name: "macOS 13 Ventura"
-            min-supported: true
+          # macOS 13 removed - doesn't support Xcode objectVersion 77
           - os: macos-14  
             os-name: "macOS 14 Sonoma"
             current-stable: true
+            min-supported: true
           - os: macos-15
             os-name: "macOS 15 Sequoia"
             latest: true

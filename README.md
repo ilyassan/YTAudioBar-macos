@@ -3,7 +3,7 @@
 [![GitHub release](https://img.shields.io/github/release/yourusername/YTAudioBar-macos.svg)](https://github.com/yourusername/YTAudioBar-macos/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/yourusername/YTAudioBar-macos/total.svg)](https://github.com/yourusername/YTAudioBar-macos/releases/latest)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![macOS](https://img.shields.io/badge/macOS-13.0+-blue.svg)](https://www.apple.com/macos/)
+[![macOS](https://img.shields.io/badge/macOS-14.0+-blue.svg)](https://www.apple.com/macos/)
 
 > A modern macOS menu bar application for YouTube audio streaming and downloading
 
@@ -65,7 +65,7 @@ YTAudioBar transforms your Mac's menu bar into a powerful YouTube audio player. 
 6. Grant necessary permissions when prompted
 
 ### System Requirements
-- **macOS 13.0** or later
+- **macOS 14.0** (Sonoma) or later
 - **~15MB** free disk space (app bundle)
 - **~95MB** additional for dependencies (downloaded on first launch)
 - **Internet connection** for streaming and setup
@@ -75,7 +75,7 @@ YTAudioBar transforms your Mac's menu bar into a powerful YouTube audio player. 
 ### Prerequisites
 - Xcode 15.0 or later
 - Swift 5.9 or later
-- macOS 13.0 SDK or later
+- macOS 14.0 SDK or later
 
 ### Building
 
