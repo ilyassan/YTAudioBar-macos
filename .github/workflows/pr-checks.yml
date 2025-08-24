@@ -72,8 +72,12 @@ jobs:
         fi
         
   build-check:
-    name: Build Check
-    runs-on: macos-latest
+    name: Build Check on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [macos-13, macos-14, macos-15]
     
     steps:
     - name: Checkout code

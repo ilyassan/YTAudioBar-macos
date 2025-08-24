@@ -8,9 +8,13 @@ on:
 
 jobs:
   build-and-test:
-    name: Build and Test on macOS
-    runs-on: macos-latest
+    name: Build and Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     
+    strategy:
+      matrix:
+        os: [macos-13, macos-14, macos-15]
+        
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
