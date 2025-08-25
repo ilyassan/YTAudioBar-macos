@@ -90,7 +90,7 @@ class DependencyManager: ObservableObject {
                 
                 let destinationURL = resourcesDirectory.appendingPathComponent(dependency.filename)
                 
-                try await downloadFile(from: dependency.url, to: destinationURL)
+                try await downloadFile(from: dependency.url, to: destinationURL, dependencyIndex: index, totalDependencies: totalDependencies)
                 
                 if dependency.name == "ffmpeg" {
                     currentOperation = "Extracting \(dependency.name)..."
@@ -102,7 +102,7 @@ class DependencyManager: ObservableObject {
                     try await makeExecutable(at: destinationURL)
                 }
                 
-                downloadProgress = Double(index + 1) / Double(totalDependencies)
+                // Progress is now updated in real-time by the download delegate
             }
             
             currentOperation = "Verifying dependencies..."
@@ -131,7 +131,7 @@ class DependencyManager: ObservableObject {
         }
     }
     
-    private func downloadFile(from urlString: String, to destinationURL: URL) async throws {
+    private func downloadFile(from urlString: String, to destinationURL: URL, dependencyIndex: Int, totalDependencies: Int) async throws {
         guard let url = URL(string: urlString) else {
             throw DependencyError.invalidURL
         }
@@ -143,11 +143,12 @@ class DependencyManager: ObservableObject {
         
         // Create URLSession with timeout
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 60.0 // 60 seconds
-        config.timeoutIntervalForResource = 300.0 // 5 minutes
+        config.timeoutIntervalForRequest = 60.0
+        config.timeoutIntervalForResource = 300.0
         let session = URLSession(configuration: config)
         
-        let (tempURL, response) = try await session.download(from: url)
+        // Get response first to get content length
+        let (asyncBytes, response) = try await session.bytes(from: url)
         
         // Validate response
         guard let httpResponse = response as? HTTPURLResponse,
@@ -155,6 +156,68 @@ class DependencyManager: ObservableObject {
             throw DependencyError.downloadFailed("HTTP error: \(response)")
         }
         
+        // Get expected total bytes for progress calculation
+        let expectedContentLength = httpResponse.expectedContentLength > 0 ? httpResponse.expectedContentLength : 0
+        
+        // Create temporary file for writing
+        let tempURL = destinationURL.appendingPathExtension("tmp")
+        
+        // Ensure parent directory exists
+        let parentDir = destinationURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
+        
+        var totalBytesWritten: Int64 = 0
+        var buffer = Data()
+        let bufferSize = 8192 // 8KB buffer
+        
+        // Create file handle for writing
+        FileManager.default.createFile(atPath: tempURL.path, contents: nil)
+        let fileHandle = try FileHandle(forWritingTo: tempURL)
+        defer { 
+            try? fileHandle.close()
+        }
+        
+        // Process bytes in chunks for better performance
+        for try await byte in asyncBytes {
+            buffer.append(byte)
+            
+            // Write in chunks when buffer is full
+            if buffer.count >= bufferSize {
+                fileHandle.write(buffer)
+                totalBytesWritten += Int64(buffer.count)
+                buffer.removeAll()
+                
+                // Update progress
+                let individualProgress = expectedContentLength > 0 ? 
+                    Double(totalBytesWritten) / Double(expectedContentLength) : 0.0
+                
+                // Calculate overall progress across all dependencies
+                let baseProgress = Double(dependencyIndex) / Double(totalDependencies)
+                let progressIncrement = individualProgress / Double(totalDependencies)
+                let overallProgress = baseProgress + progressIncrement
+                
+                await MainActor.run {
+                    self.downloadProgress = overallProgress
+                }
+            }
+        }
+        
+        // Write remaining bytes in buffer
+        if !buffer.isEmpty {
+            fileHandle.write(buffer)
+            totalBytesWritten += Int64(buffer.count)
+        }
+        
+        // Ensure final progress update
+        let finalProgress = Double(dependencyIndex + 1) / Double(totalDependencies)
+        await MainActor.run {
+            self.downloadProgress = finalProgress
+        }
+        
+        // Move temp file to final destination
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            try FileManager.default.removeItem(at: destinationURL)
+        }
         try FileManager.default.moveItem(at: tempURL, to: destinationURL)
     }
     
@@ -238,3 +301,4 @@ enum DependencyError: LocalizedError {
         }
     }
 }
+
