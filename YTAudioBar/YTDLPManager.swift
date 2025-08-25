@@ -22,8 +22,6 @@ class YTDLPManager: ObservableObject {
     static let shared = YTDLPManager()
     
     var ytdlpPath: String // Make public for DownloadManager access
-    var ffmpegPath: String // Path to bundled ffmpeg
-    var ffprobePath: String // Path to bundled ffprobe
     private var downloadTasks: [String: Process] = [:]
     
     init() {
@@ -32,8 +30,6 @@ class YTDLPManager: ObservableObject {
         
         // Set paths from DependencyManager
         ytdlpPath = dependencyManager.ytdlpPath
-        ffmpegPath = dependencyManager.ffmpegPath
-        ffprobePath = dependencyManager.ffmpegPath // ffprobe not needed for our use case
         
         // Fallback to system paths if dependencies don't exist
         if !FileManager.default.fileExists(atPath: ytdlpPath) {
@@ -51,24 +47,8 @@ class YTDLPManager: ObservableObject {
             }
         }
         
-        if !FileManager.default.fileExists(atPath: ffmpegPath) {
-            let systemPaths = [
-                "/usr/local/bin/ffmpeg",
-                "/opt/homebrew/bin/ffmpeg",
-                "/usr/bin/ffmpeg"
-            ]
-            
-            for path in systemPaths {
-                if FileManager.default.fileExists(atPath: path) {
-                    ffmpegPath = path
-                    ffprobePath = path.replacingOccurrences(of: "ffmpeg", with: "ffprobe")
-                    break
-                }
-            }
-        }
         
         print("YTDLPManager using yt-dlp at: \(ytdlpPath)")
-        print("YTDLPManager using ffmpeg at: \(ffmpegPath)")
     }
     
     // MARK: - Search Functionality

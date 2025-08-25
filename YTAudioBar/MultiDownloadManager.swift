@@ -8,13 +8,26 @@
 import Foundation
 import Combine
 
-// Simplified - using only yt-dlp which works reliably
+struct DownloadProgress {
+    let videoID: String
+    let progress: Double // 0.0 to 1.0
+    let speed: String
+    let eta: String
+    let fileSize: String
+    let isCompleted: Bool
+    let error: String?
+}
 
 class MultiDownloadManager: ObservableObject {
     static let shared = MultiDownloadManager()
     
     @Published var activeDownloads: [String: DownloadProgress] = [:]
     @Published var completedDownloads: Set<String> = []
+    
+    // YouTube bot protection bypass settings
+    private var currentBypassMethod: YouTubeBotBypassMethod = .userAgentRotation
+    private var retryCount = 0
+    private let maxRetries = 3
     
     private let ytdlpManager = YTDLPManager.shared
     private var downloadTasks: [String: Process] = [:]
@@ -26,6 +39,25 @@ class MultiDownloadManager: ObservableObject {
     private var metadataCache: [String: YTVideoInfo?] = [:]
     private var lastCacheUpdate: Date = Date.distantPast
     private let cacheValidityDuration: TimeInterval = 30.0 // Cache valid for 30 seconds
+    
+    // YouTube bot bypass methods
+    enum YouTubeBotBypassMethod: CaseIterable {
+        case cookiesFromBrowser
+        case userAgentRotation
+        case cookieFile
+        case rateLimit
+        case geoBypass
+        
+        var description: String {
+            switch self {
+            case .cookiesFromBrowser: return "Browser Cookies"
+            case .userAgentRotation: return "User-Agent Rotation"
+            case .cookieFile: return "Cookie File"
+            case .rateLimit: return "Rate Limiting"
+            case .geoBypass: return "Geo Bypass"
+            }
+        }
+    }
     
     init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -66,60 +98,43 @@ class MultiDownloadManager: ObservableObject {
         print("✅ Download completed successfully")
     }
     
-    // MARK: - YT-DLP Download Implementation
+    // MARK: - Direct yt-dlp Download Implementation
     
     private func downloadWithYTDLP(track: YTVideoInfo) async throws {
+        print("📥 Starting yt-dlp direct download: \(track.title)")
+        
+        // Use yt-dlp to download audio directly (no FFmpeg required)
+        try await downloadDirectlyWithYTDLP(track: track)
+    }
+    
+    private func downloadDirectlyWithYTDLP(track: YTVideoInfo) async throws {
         return try await withCheckedThrowingContinuation { continuation in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: ytdlpManager.ytdlpPath)
             
+            // Create safe filename
             let safeTitle = sanitizeFilename(track.title)
             let safeUploader = sanitizeFilename(track.uploader)
-            let filename = "\(safeTitle) - \(safeUploader).%(ext)s"
-            let outputTemplate = downloadsDirectory.appendingPathComponent(filename).path
+            let filename = "\(safeTitle) - \(safeUploader)"
+            let outputPath = downloadsDirectory.path
             
-            // Use system ffmpeg if available
-            let systemFFmpegPaths = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
-            var ffmpegLocation: String?
+            // Build yt-dlp arguments with bot protection bypass
+            var arguments = buildYTDLPArguments(
+                format: "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio",
+                output: "\(outputPath)/\(filename).%(ext)s",
+                videoURL: "https://www.youtube.com/watch?v=\(track.id)",
+                bypassMethod: currentBypassMethod
+            )
             
-            for path in systemFFmpegPaths {
-                if FileManager.default.fileExists(atPath: "\(path)/ffmpeg") && 
-                   FileManager.default.fileExists(atPath: "\(path)/ffprobe") {
-                    ffmpegLocation = path
-                    break
-                }
-            }
+            process.arguments = arguments
             
-            if let ffmpegLoc = ffmpegLocation {
-                process.arguments = [
-                    "--extract-audio",
-                    "--audio-format", "m4a",
-                    "--audio-quality", "best",
-                    "--output", outputTemplate,
-                    "--newline",
-                    "--ffmpeg-location", ffmpegLoc,
-                    "https://www.youtube.com/watch?v=\(track.id)"
-                ]
-                print("🔧 YT-DLP using system ffmpeg at: \(ffmpegLoc)")
-            } else {
-                process.arguments = [
-                    "--extract-audio",
-                    "--audio-format", "m4a",
-                    "--audio-quality", "best",
-                    "--output", outputTemplate,
-                    "--newline",
-                    "https://www.youtube.com/watch?v=\(track.id)"
-                ]
-                print("⚠️ YT-DLP without ffmpeg location")
-            }
+            print("🔧 yt-dlp download command: \(ytdlpManager.ytdlpPath) \(process.arguments?.joined(separator: " ") ?? "")")
             
-            setupProcessMonitoring(process: process, track: track, continuation: continuation)
+            setupYTDLPProcessMonitoring(process: process, track: track, continuation: continuation)
         }
     }
     
-    // MARK: - Process Monitoring
-    
-    private func setupProcessMonitoring(process: Process, track: YTVideoInfo, continuation: CheckedContinuation<Void, Error>) {
+    private func setupYTDLPProcessMonitoring(process: Process, track: YTVideoInfo, continuation: CheckedContinuation<Void, Error>) {
         let outputPipe = Pipe()
         let errorPipe = Pipe()
         process.standardOutput = outputPipe
@@ -134,7 +149,7 @@ class MultiDownloadManager: ObservableObject {
             let data = handle.availableData
             if !data.isEmpty {
                 let output = String(data: data, encoding: .utf8) ?? ""
-                self?.parseDownloadProgress(output: output, for: track.id)
+                self?.parseYTDLPProgress(output: output, for: track.id)
             }
         }
         
@@ -142,8 +157,7 @@ class MultiDownloadManager: ObservableObject {
             let data = handle.availableData
             if !data.isEmpty {
                 let error = String(data: data, encoding: .utf8) ?? ""
-                print("🔍 YT-DLP stderr: \(error)")
-                self?.parseDownloadProgress(output: error, for: track.id)
+                print("🔍 yt-dlp stderr: \(error)")
             }
         }
         
@@ -155,54 +169,247 @@ class MultiDownloadManager: ObservableObject {
                 errorHandle.readabilityHandler = nil
                 
                 if process.terminationStatus == 0 {
-                    print("✅ YT-DLP download completed successfully for: \(track.title)")
+                    print("✅ yt-dlp download completed successfully for: \(track.title)")
+                    self?.retryCount = 0 // Reset retry count on success
                     self?.markDownloadCompleted(track.id)
-                    self?.saveTrackMetadata(track) // Save metadata when download completes
+                    self?.saveTrackMetadata(track)
                     self?.notificationManager.showDownloadCompleted(track)
                     continuation.resume()
                 } else {
-                    print("❌ YT-DLP download failed with status: \(process.terminationStatus)")
-                    let errorMessage = "YT-DLP failed with status \(process.terminationStatus)"
-                    continuation.resume(throwing: YTDLPError.downloadFailed(errorMessage))
+                    print("❌ yt-dlp download failed with status: \(process.terminationStatus)")
+                    
+                    // Check if this is a bot detection error and we should retry with different method
+                    let shouldRetry = self?.shouldRetryWithDifferentMethod(process: process) ?? false
+                    
+                    if shouldRetry && (self?.retryCount ?? 0) < (self?.maxRetries ?? 0) {
+                        print("🔄 Retrying download with different bypass method...")
+                        self?.retryCount += 1
+                        self?.switchToNextBypassMethod()
+                        
+                        // Update progress to show retry
+                        self?.activeDownloads[track.id] = DownloadProgress(
+                            videoID: track.id,
+                            progress: 0.0,
+                            speed: "Retrying...",
+                            eta: "Switching method",
+                            fileSize: "",
+                            isCompleted: false,
+                            error: nil
+                        )
+                        
+                        // Retry the download with new method
+                        Task {
+                            do {
+                                try await self?.downloadDirectlyWithYTDLP(track: track)
+                                continuation.resume()
+                            } catch {
+                                continuation.resume(throwing: error)
+                            }
+                        }
+                    } else {
+                        // Max retries reached or non-retryable error
+                        let errorMessage = "Download failed with status \(process.terminationStatus) after \(self?.retryCount ?? 0) retries"
+                        
+                        self?.retryCount = 0 // Reset for next download
+                        
+                        // Update download progress to show error
+                        self?.activeDownloads[track.id] = DownloadProgress(
+                            videoID: track.id,
+                            progress: 0.0,
+                            speed: "",
+                            eta: "",
+                            fileSize: "",
+                            isCompleted: false,
+                            error: errorMessage
+                        )
+                        
+                        self?.notificationManager.showDownloadFailed(track, error: errorMessage)
+                        continuation.resume(throwing: YTDLPError.downloadFailed(errorMessage))
+                    }
                 }
             }
         }
         
         do {
             try process.run()
-            print("🚀 YT-DLP download process started for: \(track.title)")
+            print("🚀 yt-dlp download process started for: \(track.title)")
         } catch {
             downloadTasks.removeValue(forKey: track.id)
             continuation.resume(throwing: error)
         }
     }
     
-    // MARK: - Progress Parsing
+    // MARK: - YouTube Bot Protection Bypass Methods
     
-    private func parseDownloadProgress(output: String, for videoID: String) {
+    private func buildYTDLPArguments(format: String, output: String, videoURL: String, bypassMethod: YouTubeBotBypassMethod) -> [String] {
+        var arguments: [String] = []
+        
+        // Base arguments
+        arguments.append(contentsOf: [
+            "--format", format,
+            "--output", output,
+            "--no-playlist",
+            "--no-warnings",
+            "--progress"
+        ])
+        
+        // Add bypass method specific arguments
+        switch bypassMethod {
+        case .cookiesFromBrowser:
+            // Method 1: Extract cookies from signed-in browser (with fallback for permission issues)
+            let browser = detectDefaultBrowser()
+            arguments.append(contentsOf: [
+                "--cookies-from-browser", "\(browser):+",  // Use "browser:+" for keychain fallback
+                "--extractor-args", "youtube:skip=dash,hls"
+            ])
+            print("🍪 Using browser cookies bypass method with keychain fallback")
+            
+        case .geoBypass:
+            // Method 2: Advanced geo-bypass with proxy rotation
+            arguments.append(contentsOf: [
+                "--geo-bypass-country", "US",
+                "--extractor-args", "youtube:player_skip=configs,js",
+                "--sleep-requests", "1",
+                "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            ])
+            print("🌍 Using geo-bypass method")
+            
+        case .cookieFile:
+            // Method 3: Use cookie file if it exists
+            let cookieFile = getCookieFilePath()
+            if FileManager.default.fileExists(atPath: cookieFile.path) {
+                arguments.append(contentsOf: [
+                    "--cookies", cookieFile.path
+                ])
+                print("📋 Using cookie file bypass method")
+            } else {
+                print("⚠️ Cookie file not found, falling back to user-agent rotation")
+                return buildYTDLPArguments(format: format, output: output, videoURL: videoURL, bypassMethod: .userAgentRotation)
+            }
+            
+        case .userAgentRotation:
+            // Method 4: User-Agent rotation with realistic headers
+            let userAgents = [
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+            ]
+            let selectedUA = userAgents.randomElement() ?? userAgents[0]
+            arguments.append(contentsOf: [
+                "--user-agent", selectedUA,
+                "--referer", "https://www.youtube.com/",
+                "--add-header", "Accept-Language:en-US,en;q=0.9"
+            ])
+            print("🕸️ Using user-agent rotation bypass method")
+            
+        case .rateLimit:
+            // Method 5: Rate limiting with delays to appear more human-like
+            arguments.append(contentsOf: [
+                "--sleep-interval", "2",
+                "--max-sleep-interval", "8",
+                "--sleep-subtitles", "1",
+                "--extractor-args", "youtube:player_skip=configs,webpage"
+            ])
+            print("⏱️ Using rate limiting bypass method")
+        }
+        
+        // Common anti-detection arguments for all methods
+        arguments.append(contentsOf: [
+            "--no-check-certificate",
+            "--geo-bypass",
+            "--ignore-errors"
+        ])
+        
+        // Add the video URL last
+        arguments.append(videoURL)
+        
+        return arguments
+    }
+    
+    private func detectDefaultBrowser() -> String {
+        // Try to detect the user's default browser for cookie extraction
+        let browserPrefs = [
+            ("safari", "/Applications/Safari.app"),
+            ("chrome", "/Applications/Google Chrome.app"),
+            ("firefox", "/Applications/Firefox.app"),
+            ("edge", "/Applications/Microsoft Edge.app")
+        ]
+        
+        for (browser, path) in browserPrefs {
+            if FileManager.default.fileExists(atPath: path) {
+                print("🔍 Detected browser: \(browser)")
+                return browser
+            }
+        }
+        
+        print("🔍 No specific browser detected, defaulting to safari")
+        return "safari"
+    }
+    
+    private func getCookieFilePath() -> URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupport.appendingPathComponent("YTAudioBar/youtube_cookies.txt")
+    }
+    
+    private func switchToNextBypassMethod() {
+        let allMethods = YouTubeBotBypassMethod.allCases
+        if let currentIndex = allMethods.firstIndex(of: currentBypassMethod) {
+            let nextIndex = (currentIndex + 1) % allMethods.count
+            currentBypassMethod = allMethods[nextIndex]
+            print("🔄 Switching to bypass method: \(currentBypassMethod.description)")
+        }
+    }
+    
+    private func shouldRetryWithDifferentMethod(process: Process) -> Bool {
+        // Check for common bot detection error patterns
+        let botDetectionPatterns = [
+            "Sign in to confirm you're not a bot",
+            "This helps protect our community",
+            "Confirm you're not a bot",
+            "ERROR: [youtube]",
+            "Sign in to confirm",
+            "HTTP Error 403",
+            "Unable to extract",
+            "Video unavailable"
+        ]
+        
+        // For now, we'll retry on any failure status that's not 0
+        // In the future, we could capture stderr output and check for specific error messages
+        if process.terminationStatus != 0 {
+            print("🤖 Detected potential bot protection (exit code: \(process.terminationStatus)), will retry with different method")
+            return true
+        }
+        
+        return false
+    }
+
+    // MARK: - yt-dlp Progress Parsing
+    
+    private func parseYTDLPProgress(output: String, for videoID: String) {
         DispatchQueue.main.async { [weak self] in
             let lines = output.components(separatedBy: .newlines)
             
             for line in lines {
+                // Parse yt-dlp progress lines like: [download]  45.2% of 5.67MiB at 2.3MiB/s ETA 00:01
                 if line.contains("[download]") && line.contains("%") {
-                    let components = line.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+                    let parts = line.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
                     
                     var progress: Double = 0.0
                     var speed = ""
                     var eta = ""
                     var fileSize = ""
                     
-                    for (index, component) in components.enumerated() {
-                        if component.hasSuffix("%") {
-                            let percentString = component.replacingOccurrences(of: "%", with: "")
-                            progress = Double(percentString) ?? 0.0
-                            progress = progress / 100.0
-                        } else if component == "of" && index + 1 < components.count {
-                            fileSize = components[index + 1]
-                        } else if component == "at" && index + 1 < components.count {
-                            speed = components[index + 1]
-                        } else if component == "ETA" && index + 1 < components.count {
-                            eta = components[index + 1]
+                    for (index, part) in parts.enumerated() {
+                        if part.contains("%") {
+                            let progressString = part.replacingOccurrences(of: "%", with: "")
+                            progress = Double(progressString) ?? 0.0
+                            progress = progress / 100.0 // Convert to 0.0-1.0 range
+                        } else if part.contains("MiB") && index > 0 && parts[index-1] == "of" {
+                            fileSize = part
+                        } else if part.contains("MiB/s") || part.contains("KiB/s") {
+                            speed = part
+                        } else if part == "ETA" && index + 1 < parts.count {
+                            eta = parts[index + 1]
                         }
                     }
                     

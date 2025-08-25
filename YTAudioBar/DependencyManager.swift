@@ -12,7 +12,6 @@ class DependencyManager: ObservableObject {
     
     private let resourcesDirectory: URL
     private let ytdlpURL: URL
-    private let ffmpegURL: URL
     
     struct DependencyInfo {
         let name: String
@@ -21,20 +20,16 @@ class DependencyManager: ObservableObject {
         let isExecutable: Bool
     }
     
-    private let dependencies: [DependencyInfo] = [
-        DependencyInfo(
-            name: "yt-dlp",
-            url: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
-            filename: "yt-dlp",
-            isExecutable: true
-        ),
-        DependencyInfo(
-            name: "ffmpeg", 
-            url: "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip",
-            filename: "ffmpeg.zip",
-            isExecutable: false
-        )
-    ]
+    private lazy var dependencies: [DependencyInfo] = {
+        return [
+            DependencyInfo(
+                name: "yt-dlp",
+                url: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
+                filename: "yt-dlp",
+                isExecutable: true
+            )
+        ]
+    }()
     
     private init() {
         let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -43,7 +38,6 @@ class DependencyManager: ObservableObject {
         
         self.resourcesDirectory = appSupportDirectory.appendingPathComponent("Resources")
         self.ytdlpURL = resourcesDirectory.appendingPathComponent("yt-dlp")
-        self.ffmpegURL = resourcesDirectory.appendingPathComponent("ffmpeg")
         
         createResourcesDirectory()
     }
@@ -57,17 +51,13 @@ class DependencyManager: ObservableObject {
     }
     
     var allDependenciesExist: Bool {
-        return FileManager.default.fileExists(atPath: ytdlpURL.path) &&
-               FileManager.default.fileExists(atPath: ffmpegURL.path)
+        return FileManager.default.fileExists(atPath: ytdlpURL.path)
     }
     
     var ytdlpPath: String {
         return ytdlpURL.path
     }
     
-    var ffmpegPath: String {
-        return ffmpegURL.path
-    }
     
     @MainActor
     func downloadDependencies() async {
@@ -92,11 +82,6 @@ class DependencyManager: ObservableObject {
                 
                 try await downloadFile(from: dependency.url, to: destinationURL, dependencyIndex: index, totalDependencies: totalDependencies)
                 
-                if dependency.name == "ffmpeg" {
-                    currentOperation = "Extracting \(dependency.name)..."
-                    try await extractFFmpeg(from: destinationURL)
-                    try FileManager.default.removeItem(at: destinationURL)
-                }
                 
                 if dependency.isExecutable {
                     try await makeExecutable(at: destinationURL)
@@ -122,12 +107,8 @@ class DependencyManager: ObservableObject {
     
     private func cleanupExistingFiles() async throws {
         // Remove any existing files to avoid conflicts
-        let filesToCleanup = [ytdlpURL, ffmpegURL]
-        
-        for fileURL in filesToCleanup {
-            if FileManager.default.fileExists(atPath: fileURL.path) {
-                try? FileManager.default.removeItem(at: fileURL)
-            }
+        if FileManager.default.fileExists(atPath: ytdlpURL.path) {
+            try? FileManager.default.removeItem(at: ytdlpURL)
         }
     }
     
@@ -221,19 +202,6 @@ class DependencyManager: ObservableObject {
         try FileManager.default.moveItem(at: tempURL, to: destinationURL)
     }
     
-    private func extractFFmpeg(from zipURL: URL) async throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-        process.arguments = ["-o", zipURL.path, "-d", resourcesDirectory.path]
-        process.currentDirectoryURL = resourcesDirectory
-        
-        try process.run()
-        process.waitUntilExit()
-        
-        if process.terminationStatus != 0 {
-            throw DependencyError.extractionFailed
-        }
-    }
     
     private func makeExecutable(at url: URL) async throws {
         let process = Process()
@@ -249,10 +217,9 @@ class DependencyManager: ObservableObject {
     }
     
     private func verifyDependencies() async throws {
-        // Basic file existence and executability check
+        // Basic file existence and executability check for yt-dlp only
         let filesToVerify = [
-            ("yt-dlp", ytdlpURL),
-            ("ffmpeg", ffmpegURL)
+            ("yt-dlp", ytdlpURL)
         ]
         
         for (name, url) in filesToVerify {
@@ -281,7 +248,6 @@ class DependencyManager: ObservableObject {
 
 enum DependencyError: LocalizedError {
     case invalidURL
-    case extractionFailed
     case permissionFailed
     case verificationFailed(String)
     case downloadFailed(String)
@@ -290,8 +256,6 @@ enum DependencyError: LocalizedError {
         switch self {
         case .invalidURL:
             return "Invalid download URL"
-        case .extractionFailed:
-            return "Failed to extract archive"
         case .permissionFailed:
             return "Failed to set executable permissions"
         case .verificationFailed(let dependency):

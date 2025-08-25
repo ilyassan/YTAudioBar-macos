@@ -61,22 +61,7 @@ struct DependencySetupView: View {
                         Text("yt-dlp")
                             .fontWeight(.medium)
                         Spacer()
-                        Text("~35MB")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Color(.controlBackgroundColor))
-                    .cornerRadius(8)
-                    
-                    HStack(spacing: 12) {
-                        Image(systemName: "waveform")
-                            .foregroundColor(.green)
-                        Text("ffmpeg")
-                            .fontWeight(.medium)
-                        Spacer()
-                        Text("~60MB")
+                        Text("~15MB")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
