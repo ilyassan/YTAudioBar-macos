@@ -61,13 +61,13 @@ YTAudioBar transforms your Mac's menu bar into a powerful YouTube audio player. 
 2. Open the downloaded `.dmg` file
 3. Drag `YTAudioBar.app` to your `Applications` folder
 4. Launch YTAudioBar from Applications or Spotlight
-5. **First launch** - Download required dependencies (yt-dlp + ffmpeg)
+5. **First launch** - Download required dependencies (yt-dlp)
 6. Grant necessary permissions when prompted
 
 ### System Requirements
 - **macOS 14.0** (Sonoma) or later
 - **~15MB** free disk space (app bundle)
-- **~95MB** additional for dependencies (downloaded on first launch)
+- **~15MB** additional for dependencies (downloaded on first launch)
 - **Internet connection** for streaming and setup
 
 ## 🚀 Build from Source
@@ -93,14 +93,14 @@ Press `⌘R` in Xcode to build and run the app.
 #### Dependencies
 YTAudioBar uses a **runtime dependency system** that downloads required components on first launch:
 
-- **yt-dlp** (~35MB) - YouTube integration and streaming
-- **ffmpeg** (~60MB) - Audio processing and downloads
+- **yt-dlp** (~15MB) - YouTube integration, streaming, and raw audio downloads
 
 This approach:
 - ✅ Keeps the app bundle small (~15MB)
 - ✅ Always uses the latest dependency versions
 - ✅ Reduces repository size and complexity
 - ✅ Professional macOS app standard
+- ✅ No heavy audio processing dependencies needed
 
 #### Troubleshooting
 - **Search not working**: Dependencies will be automatically downloaded on first launch
@@ -113,8 +113,7 @@ This approach:
 - **AVFoundation** - Audio playback and processing
 - **Core Data** - Local data persistence
 - **Combine** - Reactive programming
-- **yt-dlp** - YouTube content extraction
-- **FFmpeg** - Audio processing and conversion
+- **yt-dlp** - YouTube content extraction and raw audio downloads
 
 ## 📷 Screenshots
 
@@ -152,8 +151,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) for YouTube content extraction
-- [FFmpeg](https://ffmpeg.org/) for audio processing
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) for YouTube content extraction and audio downloads
 - The Swift and macOS developer community
 - [MonitorControl](https://github.com/MonitorControl/MonitorControl) for project structure inspiration
 
