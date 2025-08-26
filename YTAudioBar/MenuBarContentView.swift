@@ -191,16 +191,20 @@ struct CurrentTrackView: View {
     @ViewBuilder
     private func minimizedPlayerView() -> some View {
         HStack(spacing: 12) {
-            // Left: Audio wave visualization
-            AudioWaveView(isPlaying: audioManager.isPlaying)
-                .frame(width: 50, height: 20)
+            // Left: Static audio icon (no animation)
+            Image(systemName: audioManager.isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
+                .font(.system(size: 16))
+                .foregroundColor(audioManager.isPlaying ? .accentColor : .secondary)
+                .frame(width: 20, height: 20)
             
-            // Center: Track info with scrolling title
+            // Center: Track info with static title
             VStack(alignment: .leading, spacing: 0) {
-                ScrollingText(text: ytTrack?.title ?? track?.title ?? "Unknown")
+                Text(ytTrack?.title ?? track?.title ?? "Unknown")
                     .font(.caption)
                     .fontWeight(.medium)
                     .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 
                 if let artist = ytTrack?.uploader ?? track?.author {
                     Text(artist)
