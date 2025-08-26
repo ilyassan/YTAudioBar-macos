@@ -261,7 +261,7 @@ struct CurrentTrackView: View {
                             .font(.system(size: 10))
                             .foregroundColor(.white.opacity(0.8))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(HoverButtonStyle(width: 20, height: 20))
                 }
             }
         }
@@ -302,7 +302,7 @@ struct CurrentTrackView: View {
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(HoverButtonStyle(width: 24, height: 24))
             }
             
             // Playback controls
@@ -1350,6 +1350,37 @@ struct SettingsSection<Content: View>: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
         )
+    }
+}
+
+// Hover Button Style for minimize/maximize buttons
+struct HoverButtonStyle: ButtonStyle {
+    let width: CGFloat
+    let height: CGFloat
+    @State private var isHovered = false
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(width: width, height: height)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(backgroundColorForState(configuration: configuration))
+                    .animation(.easeInOut(duration: 0.15), value: isHovered)
+            )
+            .contentShape(Rectangle()) // Make entire frame clickable
+            .onHover { hovering in
+                isHovered = hovering
+            }
+    }
+    
+    private func backgroundColorForState(configuration: Configuration) -> Color {
+        if configuration.isPressed {
+            return Color.gray.opacity(0.4)
+        } else if isHovered {
+            return Color.gray.opacity(0.2)
+        } else {
+            return Color.clear
+        }
     }
 }
 
