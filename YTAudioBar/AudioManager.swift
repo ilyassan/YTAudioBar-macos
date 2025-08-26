@@ -275,8 +275,9 @@ class AudioManager: NSObject, ObservableObject {
         // Setup time observer for new player
         setupTimeObserver()
         
-        // Start playback
+        // Start playback with current playback rate
         player?.play()
+        player?.rate = playbackRate // Apply current playback rate
         isPlaying = true
         isLoading = false
         
@@ -353,8 +354,9 @@ class AudioManager: NSObject, ObservableObject {
             // Setup time observer for new player
             setupTimeObserver()
             
-            // Start playback
+            // Start playback with current playback rate
             player?.play()
+            player?.rate = playbackRate // Apply current playback rate
             isPlaying = true
             isLoading = false
             
@@ -380,7 +382,8 @@ class AudioManager: NSObject, ObservableObject {
             endOfTrackTimer?.invalidate()
             endOfTrackTimer = nil
         } else {
-            player.rate = playbackRate
+            player.play()
+            player.rate = playbackRate // Ensure rate is applied when resuming
             isPlaying = true
             // Resume timer when resuming playback
             if let track = currentTrack, track.duration > 0 {
