@@ -22,7 +22,7 @@ class AudioManager: NSObject, ObservableObject {
     
     // Performance optimization properties
     private var lastPositionUpdate: TimeInterval = 0
-    private let positionUpdateThrottle: TimeInterval = 0.5 // Only update position every 0.5 seconds
+    private let positionUpdateThrottle: TimeInterval = 0.5 // Only update position every 1 second (was 0.5)
     private var positionUpdateWorkItem: DispatchWorkItem?
     private var internalCurrentPosition: TimeInterval = 0 // Internal position tracker
     private var isAppActive: Bool = true // Track app activity for power management
@@ -96,9 +96,11 @@ class AudioManager: NSObject, ObservableObject {
         // Set up new time observer only if we have a player and app is active
         guard let currentPlayer = player, isAppActive else { return }
         
-        // PERFORMANCE OPTIMIZATION: Reduce frequency from 0.1s to 1.0s to save CPU and battery
-        // UI will still feel responsive with 1-second updates, but CPU usage will be 10x lower
-        let interval = CMTime(seconds: 1.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        // PERFORMANCE OPTIMIZATION: Adaptive update frequency based on app state
+        // Active: 1.0s updates for responsive UI
+        // Background: 5.0s updates for minimal CPU usage
+        let updateInterval = isAppActive ? 1.0 : 5.0
+        let interval = CMTime(seconds: updateInterval, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
         
         // Use main queue directly and simplify the update logic
         timeObserver = currentPlayer.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in

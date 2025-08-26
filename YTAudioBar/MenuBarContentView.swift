@@ -422,6 +422,7 @@ struct AudioWaveView: View {
     let isPlaying: Bool
     @State private var animationTimer: Timer?
     @State private var waveHeights: [CGFloat] = Array(repeating: 1, count: 8)
+    @State private var isAppActive: Bool = true
     
     var body: some View {
         HStack(spacing: 2) {
@@ -435,12 +436,13 @@ struct AudioWaveView: View {
             }
         }
         .onAppear {
-            if isPlaying {
+            setupAppStateMonitoring()
+            if isPlaying && isAppActive {
                 startAnimation()
             }
         }
         .onChange(of: isPlaying) { playing in
-            if playing {
+            if playing && isAppActive {
                 startAnimation()
             } else {
                 stopAnimation()
@@ -449,15 +451,17 @@ struct AudioWaveView: View {
     }
     
     private func startAnimation() {
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { _ in
-            withAnimation(.easeInOut(duration: 0.12)) {
+        // PERFORMANCE OPTIMIZATION: Reduce from 8.3fps to 2fps (4x less CPU usage)
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            // Use less expensive animation with reduced complexity
+            withAnimation(.easeInOut(duration: 0.4)) {
                 for i in 0..<waveHeights.count {
                     let baseHeight: CGFloat = 3
                     let maxHeight: CGFloat = 18
-                    let randomness = CGFloat.random(in: 0.4...1.0)
-                    let wavePhase = sin(Double(i) * 0.9 + Date().timeIntervalSince1970 * 6.0)
-                    let height = baseHeight + (maxHeight - baseHeight) * randomness * CGFloat(abs(wavePhase))
-                    waveHeights[i] = max(baseHeight, height)
+                    // Simplified calculation - remove expensive sin and date operations
+                    let randomness = CGFloat.random(in: 0.5...1.0)
+                    let height = baseHeight + (maxHeight - baseHeight) * randomness
+                    waveHeights[i] = max(baseHeight, min(maxHeight, height))
                 }
             }
         }
@@ -472,6 +476,21 @@ struct AudioWaveView: View {
             }
         }
     }
+    
+    private func setupAppStateMonitoring() {
+        // Stop animations when app goes to background to save energy
+        NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { _ in
+            isAppActive = false
+            stopAnimation()
+        }
+        
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            isAppActive = true
+            if isPlaying {
+                startAnimation()
+            }
+        }
+    }
 }
 
 // Scrolling Text Component
@@ -481,6 +500,7 @@ struct ScrollingText: View {
     @State private var textWidth: CGFloat = 0
     @State private var containerWidth: CGFloat = 0
     @State private var scrollTimer: Timer?
+    @State private var isAppActive: Bool = true
     
     var body: some View {
         GeometryReader { geometry in
@@ -512,7 +532,10 @@ struct ScrollingText: View {
             .clipped()
         }
         .onAppear {
-            startScrolling()
+            setupScrollAppStateMonitoring()
+            if isAppActive {
+                startScrolling()
+            }
         }
         .onDisappear {
             stopScrolling()
@@ -521,7 +544,9 @@ struct ScrollingText: View {
             stopScrolling()
             scrollOffset = 0
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                startScrolling()
+                if isAppActive {
+                    startScrolling()
+                }
             }
         }
     }
@@ -534,8 +559,9 @@ struct ScrollingText: View {
         
         _ = textWidth + 30 // Text width + gap for calculation reference
         
-        scrollTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
-            scrollOffset -= 25 * 0.016 // 25 pixels per second
+        // PERFORMANCE OPTIMIZATION: Reduce from 62.5fps to 15fps (4x less CPU usage)
+        scrollTimer = Timer.scheduledTimer(withTimeInterval: 0.067, repeats: true) { _ in
+            scrollOffset -= 25 * 0.067 // 25 pixels per second (same speed, less frequent updates)
             
             if scrollOffset <= -(textWidth + 30) {
                 scrollOffset = 0 // Reset for infinite loop
@@ -546,6 +572,19 @@ struct ScrollingText: View {
     private func stopScrolling() {
         scrollTimer?.invalidate()
         scrollTimer = nil
+    }
+    
+    private func setupScrollAppStateMonitoring() {
+        // Stop scrolling when app goes to background to save energy
+        NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { _ in
+            isAppActive = false
+            stopScrolling()
+        }
+        
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            isAppActive = true
+            startScrolling()
+        }
     }
 }
 
