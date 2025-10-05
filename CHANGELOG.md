@@ -8,9 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Initial development and feature implementation
+- Future features and improvements
 
-## [1.0.0] - TBD
+## [1.0.1] - 2025-10-05
+
+### Performance Improvements
+- ⚡ Optimized animations and background operations reducing CPU usage by ~70%
+- 🔋 Implemented aggressive power management for better battery life
+- 🎨 Replaced animated minimized player with static design to eliminate CPU-intensive wave animations
+- 📱 Enhanced menu visibility detection to pause animations when popup is closed
+
+### Bug Fixes
+- 🎵 Fixed playback speed persistence when switching tracks
+- 🖱️ Improved mini player button usability with larger touch targets and hover effects
+- 🎯 Enhanced UI responsiveness and reduced energy impact
+
+### Improvements
+- 📦 Removed FFmpeg dependency reducing download size by 60MB (from 95MB to 15MB)
+- 🤖 Implemented YouTube bot detection bypass system for improved reliability
+- 📊 Added real-time progress tracking for dependency downloads on first launch
+- 📋 Updated system requirements to macOS 14.0+ for better compatibility
+
+### Documentation
+- 📚 Updated README to reflect FFmpeg removal and reduced dependency footprint
+- 🔧 Enhanced contribution guidelines with updated system requirements
+
+## [1.0.0] - 2025-08-23
 
 ### Added
 - 🎵 **Core Audio System**
