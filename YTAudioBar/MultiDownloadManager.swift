@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import CoreData
 
 struct DownloadProgress {
     let videoID: String
@@ -31,7 +32,7 @@ class MultiDownloadManager: ObservableObject {
     
     private let ytdlpManager = YTDLPManager.shared
     private var downloadTasks: [String: Process] = [:]
-    private let downloadsDirectory: URL
+    private var downloadsDirectory: URL
     private let notificationManager = NotificationManager.shared
     
     // Caching for performance
@@ -60,11 +61,109 @@ class MultiDownloadManager: ObservableObject {
     }
     
     init() {
+        // Initialize with a default path - will be updated when settings are loaded
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         downloadsDirectory = appSupport.appendingPathComponent("YTAudioBar/Downloads")
         
-        try? FileManager.default.createDirectory(at: downloadsDirectory, withIntermediateDirectories: true)
+        // Load the user-configured download path from settings
+        updateDownloadDirectory()
         loadCompletedDownloads()
+        
+        // Clean up any orphaned downloads on startup
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            self.cleanupOrphanedDownloads()
+        }
+    }
+    
+    // MARK: - Download Directory Management
+    
+    private func updateDownloadDirectory() {
+        let persistentContainer = PersistenceController.shared.container
+        let context = persistentContainer.viewContext
+        
+        let request: NSFetchRequest<AppSettings> = AppSettings.fetchRequest()
+        
+        do {
+            let settings = try context.fetch(request)
+            if let appSettings = settings.first,
+               let configuredPath = appSettings.defaultDownloadPath {
+                
+                // Expand tilde path
+                let expandedPath = NSString(string: configuredPath).expandingTildeInPath
+                downloadsDirectory = URL(fileURLWithPath: expandedPath)
+                
+                print("📁 Using configured download path: \(expandedPath)")
+            } else {
+                // Fallback to default if no settings found
+                let downloadsDir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+                downloadsDirectory = downloadsDir.appendingPathComponent("YTAudioBar Downloads")
+                
+                print("📁 Using default download path: \(downloadsDirectory.path)")
+            }
+            
+            // Create directory if it doesn't exist
+            try FileManager.default.createDirectory(at: downloadsDirectory, withIntermediateDirectories: true, attributes: nil)
+            
+        } catch {
+            print("❌ Error loading download path from settings: \(error)")
+            
+            // Fallback to Downloads folder if settings fail
+            let downloadsDir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+            downloadsDirectory = downloadsDir.appendingPathComponent("YTAudioBar Downloads")
+            
+            try? FileManager.default.createDirectory(at: downloadsDirectory, withIntermediateDirectories: true, attributes: nil)
+        }
+    }
+    
+    // Public method to refresh download directory when settings change
+    func refreshDownloadDirectory() {
+        updateDownloadDirectory()
+        // Invalidate cache when directory changes
+        invalidateCache()
+        
+        // Clean up orphaned downloads when directory changes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.cleanupOrphanedDownloads()
+        }
+    }
+    
+    // Get current download directory
+    func getCurrentDownloadDirectory() -> URL {
+        return downloadsDirectory
+    }
+    
+    // Check if there are any downloaded files
+    func hasDownloadedFiles() -> Bool {
+        print("🔍 hasDownloadedFiles() check:")
+        print("   completedDownloads.count: \(completedDownloads.count)")
+        print("   completedDownloads: \(Array(completedDownloads))")
+        
+        if completedDownloads.isEmpty {
+            print("   Result: false (no completed downloads in UserDefaults)")
+            return false
+        }
+        
+        // Also check if there are actual files in the directory
+        do {
+            let files = try FileManager.default.contentsOfDirectory(at: downloadsDirectory, includingPropertiesForKeys: nil)
+            let audioExtensions = ["m4a", "webm", "mp3", "aac", "ogg"]
+            let audioFiles = files.filter { file in
+                audioExtensions.contains(file.pathExtension.lowercased())
+            }
+            
+            print("   Downloads directory: \(downloadsDirectory.path)")
+            print("   Audio files found: \(audioFiles.count)")
+            print("   Audio files: \(audioFiles.map { $0.lastPathComponent })")
+            
+            let hasFiles = !audioFiles.isEmpty
+            print("   Result: \(hasFiles) (based on actual files)")
+            return hasFiles
+            
+        } catch {
+            print("   Error checking directory: \(error)")
+            print("   Result: \(completedDownloads.isEmpty) (fallback to UserDefaults)")
+            return !completedDownloads.isEmpty
+        }
     }
     
     // MARK: - Main Download Function
@@ -453,7 +552,40 @@ class MultiDownloadManager: ObservableObject {
     }
     
     func isDownloaded(_ videoID: String) -> Bool {
-        return completedDownloads.contains(videoID)
+        // First check if it's in our completed downloads list
+        guard completedDownloads.contains(videoID) else { return false }
+        
+        // Then verify the actual file exists on disk
+        if let filePath = findDownloadedFile(for: videoID) {
+            let fileExists = FileManager.default.fileExists(atPath: filePath.path)
+            
+            // If file doesn't exist, remove from completed downloads and save
+            if !fileExists {
+                print("🗑️ File missing for \(videoID), removing from completed downloads")
+                completedDownloads.remove(videoID)
+                saveCompletedDownloads()
+                
+                // Also clean up metadata file if it exists
+                let metadataFile = getMetadataFilePath(for: videoID)
+                if FileManager.default.fileExists(atPath: metadataFile.path) {
+                    try? FileManager.default.removeItem(at: metadataFile)
+                    print("🗑️ Cleaned up orphaned metadata for \(videoID)")
+                }
+                
+                // Invalidate cache since state changed
+                invalidateCache()
+                return false
+            }
+            
+            return true
+        } else {
+            // No file found, remove from completed downloads
+            print("🗑️ No file found for \(videoID), removing from completed downloads")
+            completedDownloads.remove(videoID)
+            saveCompletedDownloads()
+            invalidateCache()
+            return false
+        }
     }
     
     func isDownloading(_ videoID: String) -> Bool {
@@ -609,8 +741,156 @@ class MultiDownloadManager: ObservableObject {
         lastCacheUpdate = Date.distantPast
     }
     
+    // Periodically clean up orphaned downloads (files deleted outside app)
+    func cleanupOrphanedDownloads() {
+        print("🧹 Starting cleanup of orphaned downloads...")
+        var orphanedCount = 0
+        var recoveredMetadata = 0
+        
+        let idsToCheck = Array(completedDownloads)
+        for videoID in idsToCheck {
+            if let filePath = findDownloadedFile(for: videoID) {
+                if !FileManager.default.fileExists(atPath: filePath.path) {
+                    print("🗑️ Removing orphaned download: \(videoID)")
+                    completedDownloads.remove(videoID)
+                    
+                    // Clean up metadata file too
+                    let metadataFile = getMetadataFilePath(for: videoID)
+                    if FileManager.default.fileExists(atPath: metadataFile.path) {
+                        try? FileManager.default.removeItem(at: metadataFile)
+                    }
+                    
+                    orphanedCount += 1
+                } else {
+                    // File exists, check if metadata is missing and try to recover
+                    let metadataFile = getMetadataFilePath(for: videoID)
+                    if !FileManager.default.fileExists(atPath: metadataFile.path) {
+                        print("🔧 Found audio file without metadata: \(videoID)")
+                        if let recoveredTrack = recoverTrackFromFilename(filePath: filePath, videoID: videoID) {
+                            saveTrackMetadata(recoveredTrack)
+                            recoveredMetadata += 1
+                            print("✅ Recovered metadata for: \(recoveredTrack.title)")
+                        }
+                    }
+                }
+            } else {
+                print("🗑️ Removing download with no file: \(videoID)")
+                completedDownloads.remove(videoID)
+                orphanedCount += 1
+            }
+        }
+        
+        if orphanedCount > 0 || recoveredMetadata > 0 {
+            saveCompletedDownloads()
+            invalidateCache()
+            print("🧹 Cleaned up \(orphanedCount) orphaned downloads, recovered \(recoveredMetadata) metadata files")
+        } else {
+            print("🧹 No orphaned downloads found")
+        }
+    }
+    
+    // Helper method to recover track info from filename
+    private func recoverTrackFromFilename(filePath: URL, videoID: String) -> YTVideoInfo? {
+        let filename = filePath.lastPathComponent
+        let fileExtension = filePath.pathExtension
+        
+        let nameWithoutExtension = filename.replacingOccurrences(of: ".\(fileExtension)", with: "")
+        let components = nameWithoutExtension.components(separatedBy: " - ")
+        
+        guard components.count >= 2 else {
+            print("⚠️ Cannot recover metadata from filename: \(filename)")
+            return nil
+        }
+        
+        let title = components[0]
+        let uploader = components[1]
+        
+        return YTVideoInfo(
+            id: videoID,
+            title: title,
+            uploader: uploader,
+            duration: 0, // Unknown duration for recovered files
+            thumbnailURL: "https://i.ytimg.com/vi/\(videoID)/hqdefault.jpg",
+            audioURL: nil,
+            description: "Metadata recovered from filename"
+        )
+    }
+    
     func clearCache() {
         invalidateCache()
+    }
+    
+    // MARK: - Download Migration
+    
+    func migrateDownloads(from oldPath: URL, to newPath: URL) throws -> Bool {
+        print("🚚 Starting migration from \(oldPath.path) to \(newPath.path)")
+        
+        var migratedFiles = 0
+        var errors: [Error] = []
+        
+        // Get all files in the old download directory
+        do {
+            let files = try FileManager.default.contentsOfDirectory(at: oldPath, includingPropertiesForKeys: nil)
+            
+            // Filter for download-related files (audio files and metadata)
+            let audioExtensions = ["m4a", "webm", "mp3", "aac", "ogg"]
+            let downloadFiles = files.filter { file in
+                let ext = file.pathExtension.lowercased()
+                return audioExtensions.contains(ext) || file.pathExtension == "json"
+            }
+            
+            if downloadFiles.isEmpty {
+                print("📁 No download files found to migrate")
+                // Update directory path even if no files to migrate
+                downloadsDirectory = newPath
+                return true
+            }
+            
+            // Create new directory if it doesn't exist
+            try FileManager.default.createDirectory(at: newPath, withIntermediateDirectories: true)
+            
+            // Move each file
+            for file in downloadFiles {
+                let fileName = file.lastPathComponent
+                let destinationURL = newPath.appendingPathComponent(fileName)
+                
+                do {
+                    // Check if file already exists at destination (shouldn't happen with empty folder validation)
+                    if FileManager.default.fileExists(atPath: destinationURL.path) {
+                        print("⚠️ File already exists at destination: \(fileName)")
+                        continue
+                    }
+                    
+                    try FileManager.default.moveItem(at: file, to: destinationURL)
+                    migratedFiles += 1
+                    print("✅ Moved: \(fileName)")
+                    
+                } catch {
+                    print("❌ Failed to move \(fileName): \(error)")
+                    errors.append(error)
+                }
+            }
+            
+            // Update the download directory path
+            downloadsDirectory = newPath
+            
+            // Invalidate cache since files have moved
+            invalidateCache()
+            
+            print("🎉 Migration complete: \(migratedFiles) files moved")
+            
+            if !errors.isEmpty {
+                print("⚠️ Migration completed with \(errors.count) errors")
+                // Return success if most files were moved
+                return migratedFiles > 0
+            }
+            
+            return true
+            
+        } catch {
+            print("❌ Migration failed: \(error)")
+            throw error
+        }
     }
     
     // MARK: - Persistence

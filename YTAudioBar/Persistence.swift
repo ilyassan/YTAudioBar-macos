@@ -41,7 +41,7 @@ struct PersistenceController {
         // Create app settings
         let settings = AppSettings(context: viewContext)
         settings.id = UUID()
-        settings.defaultDownloadPath = "~/Music/YTAudioBar"
+        settings.defaultDownloadPath = "~/Downloads/YTAudioBar Downloads"
         settings.preferredAudioQuality = "best"
         settings.autoUpdateYTDLP = true
         settings.showMiniPlayer = false

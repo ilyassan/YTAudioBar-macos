@@ -1151,7 +1151,7 @@ struct FavoriteTrackRow: View {
 
 struct SettingsView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @State private var defaultDownloadPath = "~/Music/YTAudioBar"
+    @State private var defaultDownloadPath = "~/Downloads/YTAudioBar Downloads"
     @State private var preferredAudioQuality = "best"
     @State private var autoUpdateYTDLP = true
     @StateObject private var notificationManager = NotificationManager.shared
@@ -1168,11 +1168,19 @@ struct SettingsView: View {
                             Text("Download Location:")
                                 .font(.subheadline)
                             Spacer()
-                            Button("Choose...") {
-                                chooseDownloadLocation()
+                            HStack(spacing: 8) {
+                                Button("Choose...") {
+                                    chooseDownloadLocation()
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                
+                                Button("Show in Finder") {
+                                    showDownloadsFolderInFinder()
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
                         }
                         
                         Text(defaultDownloadPath)
@@ -1293,11 +1301,162 @@ struct SettingsView: View {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
+        panel.message = "Choose an empty folder for downloads. Existing downloads will be moved to the new location."
+        
         panel.begin { result in
             if result == .OK, let url = panel.url {
-                defaultDownloadPath = url.path
+                self.validateAndSetDownloadLocation(url)
             }
         }
+    }
+    
+    private func validateAndSetDownloadLocation(_ selectedURL: URL) {
+        // Check if the selected directory is empty (ignoring hidden files)
+        do {
+            let contents = try FileManager.default.contentsOfDirectory(at: selectedURL, includingPropertiesForKeys: nil)
+            
+            // Filter out hidden files (starting with .) like .DS_Store
+            let visibleContents = contents.filter { !$0.lastPathComponent.hasPrefix(".") }
+            
+            if !visibleContents.isEmpty {
+                // Directory is not empty, show error alert
+                showDirectoryNotEmptyAlert(visibleContents.count)
+                return
+            }
+            
+            // Directory is empty, proceed with migration
+            let oldPath = MultiDownloadManager.shared.getCurrentDownloadDirectory()
+            let newPath = selectedURL
+            
+            print("🔍 Migration check:")
+            print("   Old path: \(oldPath.path)")
+            print("   New path: \(newPath.path)")
+            print("   Has downloaded files: \(MultiDownloadManager.shared.hasDownloadedFiles())")
+            print("   Paths are different: \(oldPath.path != newPath.path)")
+            
+            // Check if paths are different and we have downloads to migrate
+            if oldPath.path != newPath.path && MultiDownloadManager.shared.hasDownloadedFiles() {
+                print("✅ Starting migration process...")
+                migrateDownloads(from: oldPath, to: newPath)
+            } else if oldPath.path == newPath.path {
+                print("⚠️ Same path selected, no migration needed")
+                // Same path, just keep current settings
+            } else {
+                print("📁 No downloads to migrate, just updating path")
+                // No downloads to migrate, just update path
+                defaultDownloadPath = selectedURL.path
+            }
+            
+        } catch {
+            print("❌ Error checking directory contents: \(error)")
+            showDirectoryAccessErrorAlert(error)
+        }
+    }
+    
+    private func showDirectoryNotEmptyAlert(_ fileCount: Int) {
+        let alert = NSAlert()
+        alert.messageText = "Directory Not Empty"
+        alert.informativeText = "The selected folder contains \(fileCount) file(s). Please choose an empty folder for downloads. This ensures your existing downloads can be moved safely without conflicts."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Choose Different Folder")
+        
+        let response = alert.runModal()
+        if response == .alertSecondButtonReturn {
+            // User wants to choose a different folder
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.chooseDownloadLocation()
+            }
+        }
+    }
+    
+    private func showDirectoryAccessErrorAlert(_ error: Error) {
+        let alert = NSAlert()
+        alert.messageText = "Cannot Access Directory"
+        alert.informativeText = "Unable to access the selected directory: \(error.localizedDescription)"
+        alert.alertStyle = .critical
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+    
+    private func migrateDownloads(from oldPath: URL, to newPath: URL) {
+        print("🚨 migrateDownloads called with:")
+        print("   From: \(oldPath.path)")
+        print("   To: \(newPath.path)")
+        
+        let alert = NSAlert()
+        alert.messageText = "Migrate Downloads?"
+        alert.informativeText = "Move all your downloaded files from \(oldPath.lastPathComponent) to \(newPath.lastPathComponent)? This will preserve all your downloads."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Move Files")
+        alert.addButton(withTitle: "Cancel")
+        
+        print("📋 Showing migration confirmation dialog...")
+        let response = alert.runModal()
+        print("👤 User response: \(response == .alertFirstButtonReturn ? "Move Files" : "Cancel")")
+        
+        if response == .alertFirstButtonReturn {
+            // User confirmed migration
+            print("🚀 User confirmed - starting migration...")
+            performDownloadMigration(from: oldPath, to: newPath)
+        } else {
+            print("❌ User cancelled migration")
+        }
+        // If cancelled, don't change the path
+    }
+    
+    private func performDownloadMigration(from oldPath: URL, to newPath: URL) {
+        print("💼 performDownloadMigration called:")
+        print("   From: \(oldPath.path)")
+        print("   To: \(newPath.path)")
+        
+        do {
+            print("🔧 Calling MultiDownloadManager.migrateDownloads...")
+            let success = try MultiDownloadManager.shared.migrateDownloads(from: oldPath, to: newPath)
+            print("📊 Migration result: \(success ? "SUCCESS" : "FAILED")")
+            
+            if success {
+                // Migration successful, update the path
+                print("✅ Updating defaultDownloadPath to: \(newPath.path)")
+                defaultDownloadPath = newPath.path
+                
+                // Show success alert
+                let alert = NSAlert()
+                alert.messageText = "Migration Complete"
+                alert.informativeText = "All downloads have been successfully moved to the new location."
+                alert.alertStyle = .informational
+                alert.addButton(withTitle: "OK")
+                print("🎉 Showing success alert...")
+                alert.runModal()
+            } else {
+                print("❌ Migration failed - showing failure alert")
+                showMigrationFailedAlert()
+            }
+            
+        } catch {
+            print("❌ Migration threw error: \(error)")
+            showMigrationFailedAlert(error)
+        }
+    }
+    
+    private func showMigrationFailedAlert(_ error: Error? = nil) {
+        let alert = NSAlert()
+        alert.messageText = "Migration Failed"
+        
+        if let error = error {
+            alert.informativeText = "Failed to move downloads: \(error.localizedDescription)\n\nYour downloads remain in the original location."
+        } else {
+            alert.informativeText = "Failed to move downloads. Your downloads remain in the original location."
+        }
+        
+        alert.alertStyle = .critical
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+    
+    private func showDownloadsFolderInFinder() {
+        let downloadsDirectory = MultiDownloadManager.shared.getCurrentDownloadDirectory()
+        NSWorkspace.shared.open(downloadsDirectory)
     }
     
     private func loadSettings() {
@@ -1306,7 +1465,7 @@ struct SettingsView: View {
         do {
             let settings = try viewContext.fetch(request)
             if let appSettings = settings.first {
-                defaultDownloadPath = appSettings.defaultDownloadPath ?? "~/Music/YTAudioBar"
+                defaultDownloadPath = appSettings.defaultDownloadPath ?? "~/Downloads/YTAudioBar Downloads"
                 preferredAudioQuality = appSettings.preferredAudioQuality ?? "best"
             } else {
                 createDefaultSettings()
@@ -1341,6 +1500,9 @@ struct SettingsView: View {
             appSettings.preferredAudioQuality = preferredAudioQuality
             
             saveContext()
+            
+            // Notify download manager to refresh its directory
+            MultiDownloadManager.shared.refreshDownloadDirectory()
         } catch {
             print("Failed to save settings: \(error)")
         }
