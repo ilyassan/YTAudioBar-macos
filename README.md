@@ -68,7 +68,7 @@ YTAudioBar transforms your Mac's menu bar into a powerful YouTube audio player. 
 
 ### System Requirements
 - **macOS 14.0** (Sonoma) or later
-- **~15MB** free disk space (app bundle)
+- **~900KB** free disk space (app bundle)
 - **~15MB** additional for dependencies (downloaded on first launch)
 - **Internet connection** for streaming and setup
 
@@ -98,7 +98,7 @@ YTAudioBar uses a **runtime dependency system** that downloads required componen
 - **yt-dlp** (~15MB) - YouTube integration, streaming, and raw audio downloads
 
 This approach:
-- ✅ Keeps the app bundle small (~15MB)
+- ✅ Keeps the app bundle small (~900KB)
 - ✅ Always uses the latest dependency versions
 - ✅ Reduces repository size and complexity
 - ✅ Professional macOS app standard
