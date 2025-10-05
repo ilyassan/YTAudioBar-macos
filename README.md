@@ -54,7 +54,9 @@ YTAudioBar transforms your Mac's menu bar into a powerful YouTube audio player. 
 ## 📥 Download
 
 ### Latest Release
-[**Download YTAudioBar v1.0.0**](https://github.com/ilyassan/YTAudioBar-macos/releases/latest)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/ilyassan/YTAudioBar-macos?style=for-the-badge&logo=github&logoColor=white&label=Download%20YTAudioBar)](https://github.com/ilyassan/YTAudioBar-macos/releases/latest)
+
+**[📦 Download Latest Release](https://github.com/ilyassan/YTAudioBar-macos/releases/latest)** | **[📋 View All Releases](https://github.com/ilyassan/YTAudioBar-macos/releases)**
 
 ### Installation
 1. Download the latest release from the [releases page](../../releases)
