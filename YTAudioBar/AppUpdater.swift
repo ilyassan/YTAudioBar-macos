@@ -15,7 +15,7 @@ class AppUpdater: ObservableObject {
     
     private init() {
         // Get current app version from bundle
-        self.currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        self.currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
     }
     
     @MainActor

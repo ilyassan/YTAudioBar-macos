@@ -28,9 +28,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let statusBarButton = statusBarItem.button {
             updateMenuBarIcon(isPlaying: false)
             statusBarButton.imagePosition = .imageOnly
-            statusBarButton.action = #selector(togglePopover(_:))
+            statusBarButton.action = #selector(statusBarButtonClicked(_:))
             statusBarButton.target = self
-            statusBarButton.toolTip = "YTAudioBar - Click to open"
+            statusBarButton.toolTip = "YTAudioBar - Left click to open, Right click for options"
+            
+            // Enable right-click detection
+            statusBarButton.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
         
         // Listen to audio manager state changes
@@ -53,8 +56,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         )
     }
     
-    @objc func togglePopover(_ sender: AnyObject?) {
-        if statusBarItem.button != nil {
+    @objc func statusBarButtonClicked(_ sender: NSStatusBarButton) {
+        guard let event = NSApp.currentEvent else { return }
+        
+        if event.type == .rightMouseUp {
+            // Right click - show context menu
+            showContextMenu()
+        } else {
+            // Left click - toggle popover
             if popover.isShown {
                 closePopover()
             } else {
@@ -210,5 +219,60 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 print("⚠️ Auto-update check failed: \(error.localizedDescription)")
             }
         }
+    }
+    
+    // MARK: - Context Menu Setup
+    
+    private func showContextMenu() {
+        guard let button = statusBarItem.button else { return }
+        
+        let menu = NSMenu()
+        
+        // Check for Updates menu item
+        let updateMenuItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdatesManually), keyEquivalent: "")
+        updateMenuItem.target = self
+        menu.addItem(updateMenuItem)
+        
+        // Separator
+        menu.addItem(NSMenuItem.separator())
+        
+        // About menu item
+        let aboutMenuItem = NSMenuItem(title: "About YTAudioBar", action: #selector(showAbout), keyEquivalent: "")
+        aboutMenuItem.target = self
+        menu.addItem(aboutMenuItem)
+        
+        // Separator
+        menu.addItem(NSMenuItem.separator())
+        
+        // Quit menu item
+        let quitMenuItem = NSMenuItem(title: "Quit YTAudioBar", action: #selector(quitApplication), keyEquivalent: "q")
+        quitMenuItem.target = self
+        menu.addItem(quitMenuItem)
+        
+        // Show the menu at the button location
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height), in: button)
+    }
+    
+    @objc private func checkForUpdatesManually() {
+        print("🔄 Manual update check requested")
+        Task {
+            await AppUpdater.shared.checkForUpdates(silent: false)
+        }
+    }
+    
+    @objc private func showAbout() {
+        let alert = NSAlert()
+        alert.messageText = "YTAudioBar"
+        alert.informativeText = "A powerful YouTube audio player for macOS.\n\nVersion: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")\nBuild: \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")\n\n© 2025 Ilyass Anida"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        
+        // Show the alert
+        alert.runModal()
+    }
+    
+    @objc private func quitApplication() {
+        print("👋 Quitting YTAudioBar")
+        NSApplication.shared.terminate(nil)
     }
 }

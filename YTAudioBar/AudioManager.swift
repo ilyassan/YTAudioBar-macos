@@ -38,7 +38,6 @@ class AudioManager: NSObject, ObservableObject {
     
     private let ytdlpManager = YTDLPManager.shared
     private let queueManager = QueueManager.shared
-    private let notificationManager = NotificationManager.shared
     
     override init() {
         super.init()
@@ -283,8 +282,6 @@ class AudioManager: NSObject, ObservableObject {
         isPlaying = true
         isLoading = false
         
-        // Show notification
-        notificationManager.showTrackStarted(track)
         
         print("Started playing local file: \(track.title)")
     }
@@ -362,8 +359,6 @@ class AudioManager: NSObject, ObservableObject {
             isPlaying = true
             isLoading = false
             
-            // Show notification
-            notificationManager.showTrackStarted(track)
             
             print("Started playing: \(track.title)")
         } catch {
@@ -485,21 +480,11 @@ class AudioManager: NSObject, ObservableObject {
         // Auto-advance to next track in queue - simplified since we're already on MainActor
         if let nextTrack = queueManager.playNext() {
             print("🎵 Auto-advancing to next track: \(nextTrack.title) (new index: \(queueManager.currentIndex))")
-            // Show track ended notification
-            if let current = currentTrack {
-                notificationManager.showTrackEnded(current, hasNext: true)
-            }
             Task {
                 await play(track: nextTrack)
             }
         } else {
             print("🏁 End of queue reached - no more tracks to play")
-            // Show track ended notification
-            if let current = currentTrack {
-                notificationManager.showTrackEnded(current, hasNext: false)
-            }
-            // Show queue empty notification
-            notificationManager.showQueueEmpty()
         }
     }
     

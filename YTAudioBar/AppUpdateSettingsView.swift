@@ -9,7 +9,7 @@ struct AppUpdateSettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Current Version")
                         .font(.subheadline)
-                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")")
+                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

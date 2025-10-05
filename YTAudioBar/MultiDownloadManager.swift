@@ -33,7 +33,6 @@ class MultiDownloadManager: ObservableObject {
     private let ytdlpManager = YTDLPManager.shared
     private var downloadTasks: [String: Process] = [:]
     private var downloadsDirectory: URL
-    private let notificationManager = NotificationManager.shared
     
     // Caching for performance
     private var filePathCache: [String: URL?] = [:]
@@ -272,7 +271,6 @@ class MultiDownloadManager: ObservableObject {
                     self?.retryCount = 0 // Reset retry count on success
                     self?.markDownloadCompleted(track.id)
                     self?.saveTrackMetadata(track)
-                    self?.notificationManager.showDownloadCompleted(track)
                     continuation.resume()
                 } else {
                     print("❌ yt-dlp download failed with status: \(process.terminationStatus)")
@@ -322,7 +320,6 @@ class MultiDownloadManager: ObservableObject {
                             error: errorMessage
                         )
                         
-                        self?.notificationManager.showDownloadFailed(track, error: errorMessage)
                         continuation.resume(throwing: YTDLPError.downloadFailed(errorMessage))
                     }
                 }
