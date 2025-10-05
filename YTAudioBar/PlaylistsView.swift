@@ -11,7 +11,9 @@ import CoreData
 struct PlaylistsView: View {
     @Binding var currentTrack: Track?
     @ObservedObject var audioManager: AudioManager
+    @Binding var selectedTab: Int
     @StateObject private var favoritesManager = FavoritesManager.shared
+    @StateObject private var queueManager = QueueManager.shared
     @Environment(\.managedObjectContext) private var viewContext
     
     @State private var selectedPlaylist: Playlist?
@@ -83,7 +85,8 @@ struct PlaylistsView: View {
                 PlaylistDetailView(
                     playlist: playlist,
                     currentTrack: $currentTrack,
-                    audioManager: audioManager
+                    audioManager: audioManager,
+                    selectedTab: $selectedTab
                 )
             }
         }
@@ -274,16 +277,19 @@ struct PlaylistDetailView: View {
     let playlist: Playlist
     @Binding var currentTrack: Track?
     @ObservedObject var audioManager: AudioManager
+    @Binding var selectedTab: Int
+    @StateObject private var queueManager = QueueManager.shared
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
     
     // Fetch tracks for this specific playlist
     @FetchRequest private var tracks: FetchedResults<Track>
     
-    init(playlist: Playlist, currentTrack: Binding<Track?>, audioManager: AudioManager) {
+    init(playlist: Playlist, currentTrack: Binding<Track?>, audioManager: AudioManager, selectedTab: Binding<Int>) {
         self.playlist = playlist
         self._currentTrack = currentTrack
         self.audioManager = audioManager
+        self._selectedTab = selectedTab
         
         // Set up the fetch request to get tracks through memberships
         self._tracks = FetchRequest(
@@ -395,14 +401,21 @@ struct PlaylistDetailView: View {
             )
         }
         
-        QueueManager.shared.addToQueue(videoInfoTracks)
+        guard !videoInfoTracks.isEmpty else { return }
         
-        // Start playing the first track if no track is currently playing
-        if audioManager.currentTrack == nil && !videoInfoTracks.isEmpty {
-            Task {
-                await audioManager.play(track: videoInfoTracks.first!)
-            }
+        // Clear the current queue and replace with playlist tracks
+        queueManager.clearQueue()
+        queueManager.addToQueue(videoInfoTracks)
+        
+        // Switch to the queue tab (tag 1)
+        selectedTab = 1
+        
+        // Start playing the first track immediately
+        Task {
+            await audioManager.play(track: videoInfoTracks.first!)
         }
+        
+        print("🎵 Started playing playlist with \(videoInfoTracks.count) tracks")
     }
 }
 
