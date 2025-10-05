@@ -161,7 +161,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 If you found this project useful, please consider starring it!
 
-[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/YTAudioBar-macos&type=Date)](https://star-history.com/#yourusername/YTAudioBar-macos&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=ilyassan/YTAudioBar-macos&type=Date)](https://star-history.com/#ilyassan/YTAudioBar-macos&Date)
 
 ---
 
