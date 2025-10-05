@@ -36,25 +36,6 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
         
-    - name: Archive and export app
-      run: |
-        # Archive the app
-        xcodebuild archive \
-          -project YTAudioBar.xcodeproj \
-          -scheme YTAudioBar \
-          -configuration Release \
-          -destination "platform=macOS" \
-          -archivePath build/YTAudioBar.xcarchive \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGN_IDENTITY="" \
-          PROVISIONING_PROFILE=""
-          
-        # Export the app
-        xcodebuild -exportArchive \
-          -archivePath build/YTAudioBar.xcarchive \
-          -exportPath build/export \
-          -exportOptionsPlist .github/workflows/ExportOptions.plist
-          
     - name: Create ExportOptions.plist
       run: |
         mkdir -p .github/workflows
@@ -74,6 +55,25 @@ jobs:
         </dict>
         </plist>
         EOF
+        
+    - name: Archive and export app
+      run: |
+        # Archive the app
+        xcodebuild archive \
+          -project YTAudioBar.xcodeproj \
+          -scheme YTAudioBar \
+          -configuration Release \
+          -destination "platform=macOS" \
+          -archivePath build/YTAudioBar.xcarchive \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGN_IDENTITY="" \
+          PROVISIONING_PROFILE=""
+          
+        # Export the app
+        xcodebuild -exportArchive \
+          -archivePath build/YTAudioBar.xcarchive \
+          -exportPath build/export \
+          -exportOptionsPlist .github/workflows/ExportOptions.plist
         
     - name: Prepare dependencies for DMG creation
       run: |
