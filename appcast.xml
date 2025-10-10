@@ -19,7 +19,7 @@
 - **Reduced Complexity**: Simplified codebase by removing unused notification system
 
 ### 🐛 Bug Fixes  
-- Fixed inconsistent version display in About section showing static &quot;1.0.0&quot; instead of actual version
+- Fixed inconsistent version display in About section showing static "1.0.0" instead of actual version
 - Corrected version fallback values across all app components for consistency
 
 ### 📦 Technical Changes
