@@ -137,6 +137,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Wait for release to be available
+      run: sleep 10
+
     - name: Generate Sparkle appcast.xml
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -146,6 +149,8 @@ jobs:
         cd ..
 
     - name: Commit and push appcast.xml to main branch
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"

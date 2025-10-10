@@ -24,8 +24,15 @@ def fetch_github_releases():
         github_token = os.environ.get('GITHUB_TOKEN')
 
         request = urllib.request.Request(GITHUB_API_URL)
+        # Add User-Agent header (required by GitHub API)
+        request.add_header('User-Agent', 'YTAudioBar-Appcast-Generator')
+
         if github_token:
+            # Use 'token' format (both 'token' and 'Bearer' work, but 'token' is more widely supported)
             request.add_header('Authorization', f'token {github_token}')
+            print(f"✓ Using authenticated GitHub API request", file=sys.stderr)
+        else:
+            print(f"⚠️  Warning: No GITHUB_TOKEN found, using unauthenticated request (rate limited)", file=sys.stderr)
 
         with urllib.request.urlopen(request) as response:
             return json.loads(response.read().decode())
