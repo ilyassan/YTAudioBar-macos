@@ -6,6 +6,41 @@
     <language>en</language>
     <link>https://github.com/ilyassan/YTAudioBar-macos</link>
     <item>
+      <title>Version 1.0.3</title>
+      <pubDate>Fri, 10 Oct 2025 22:55:49 +0000</pubDate>
+      <link>https://github.com/ilyassan/YTAudioBar-macos/releases/tag/v1.0.3</link>
+      <description>&lt;![CDATA[## YTAudioBar 1.0.3
+
+### 🎵 What's New
+
+### 🔧 Improvements
+- **Silent Auto-Update**: Implement the silent auto update using the sparkle framework
+
+### 📋 System Requirements
+
+- **macOS**: 14.0 (Ventura) or later
+- **Architecture**: Intel and Apple Silicon Macs supported
+- **Dependencies**: Automatically downloaded on first launch
+
+### 📥 Installation
+
+1. Download `YTAudioBar-1.0.3.dmg`
+2. Open the DMG file
+3. Drag YTAudioBar to Applications folder
+4. Launch YTAudioBar from Applications
+5. Allow dependencies to download on first launch
+
+### 🔄 Updating
+
+YTAudioBar includes automatic update checking. You'll be notified when new versions are available.
+
+---
+
+**Full Changelog**: https://github.com/ilyassan/YTAudioBar-macos/compare/v1.0.2...v1.0.3]]&gt;</description>
+      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.3/YTAudioBar-1.0.3.dmg" length="1675026" type="application/octet-stream" sparkle:version="1.0.3" sparkle:shortVersionString="1.0.3"/>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+    </item>
+    <item>
       <title>Version 1.0.2</title>
       <pubDate>Sun, 05 Oct 2025 16:31:05 +0000</pubDate>
       <link>https://github.com/ilyassan/YTAudioBar-macos/releases/tag/v1.0.2</link>
