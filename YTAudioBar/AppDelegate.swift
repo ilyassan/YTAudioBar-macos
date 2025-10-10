@@ -8,6 +8,7 @@
 import Cocoa
 import SwiftUI
 import Combine
+import Sparkle
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var statusBar: NSStatusBar!
@@ -15,7 +16,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var popover: NSPopover!
     private var audioManager = AudioManager.shared
     private var cancellables: Set<AnyCancellable> = []
-    
+    private let updaterController: SPUStandardUpdaterController
+
+    override init() {
+        // Initialize Sparkle updater
+        updaterController = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
+        super.init()
+
+        // Force automatic updates without user prompt
+        // Set these defaults BEFORE Sparkle checks permissions
+        let defaults = UserDefaults.standard
+        defaults.set(true, forKey: "SUEnableAutomaticChecks")
+        defaults.set(true, forKey: "SUAutomaticallyUpdate")
+        defaults.set(true, forKey: "SUHasLaunchedBefore")
+        defaults.set(true, forKey: "SUAutomaticallyUpdateIncludesFirstLaunch")
+        defaults.synchronize()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Hide dock icon to make it a proper menu bar app
         NSApp.setActivationPolicy(.accessory)
@@ -41,17 +62,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         
         // Check dependencies and show setup UI if needed
         checkDependenciesAndSetup()
-        
-        // Check for app updates automatically
-        checkForAppUpdates()
-        
+
+        // Sparkle will automatically check for updates on launch
+        // No need for manual checkForAppUpdates() call
+
         // Create the popover
         popover = NSPopover()
         popover.contentSize = NSSize(width: 420, height: 520)
         popover.behavior = .transient
         popover.animates = true
         popover.contentViewController = NSHostingController(
-            rootView: MenuBarContentView()
+            rootView: MenuBarContentView(updaterController: updaterController)
                 .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
         )
     }
@@ -190,13 +211,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
     
-    private func checkForAppUpdates() {
-        Task {
-            // Check for app updates silently
-            await AppUpdater.shared.checkForUpdates(silent: true)
-        }
-    }
-    
     private func performAutomaticYTDLPUpdate() {
         Task {
             do {
@@ -225,12 +239,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     
     private func showContextMenu() {
         guard let button = statusBarItem.button else { return }
-        
+
         let menu = NSMenu()
-        
-        // Check for Updates menu item
-        let updateMenuItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdatesManually), keyEquivalent: "")
-        updateMenuItem.target = self
+
+        // Check for Updates menu item - Using Sparkle
+        let updateMenuItem = NSMenuItem(title: "Check for Updates...", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
+        updateMenuItem.target = updaterController
         menu.addItem(updateMenuItem)
         
         // Separator
@@ -251,13 +265,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         
         // Show the menu at the button location
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height), in: button)
-    }
-    
-    @objc private func checkForUpdatesManually() {
-        print("🔄 Manual update check requested")
-        Task {
-            await AppUpdater.shared.checkForUpdates(silent: false)
-        }
     }
     
     @objc private func showAbout() {

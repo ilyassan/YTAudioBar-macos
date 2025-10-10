@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		0C5D8D2E2E99B9C300CD6851 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 0C5D8D2D2E99B9C300CD6851 /* Sparkle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		0C5C08282E574ECF003E8D4F /* YTAudioBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = YTAudioBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0C5D8D2E2E99B9C300CD6851 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = YTAudioBar;
 			packageProductDependencies = (
+				0C5D8D2D2E99B9C300CD6851 /* Sparkle */,
 			);
 			productName = YTAudioBar;
 			productReference = 0C5C08282E574ECF003E8D4F /* YTAudioBar.app */;
@@ -94,6 +100,9 @@
 			);
 			mainGroup = 0C5C081F2E574ECF003E8D4F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				0C5D8D2C2E99B9C300CD6851 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0C5C08292E574ECF003E8D4F /* Products */;
 			projectDirPath = "";
@@ -315,6 +324,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		0C5D8D2C2E99B9C300CD6851 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.8.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0C5D8D2D2E99B9C300CD6851 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0C5D8D2C2E99B9C300CD6851 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 0C5C08202E574ECF003E8D4F /* Project object */;
 }
