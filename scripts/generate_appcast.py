@@ -6,6 +6,7 @@ This script fetches releases from GitHub and creates an appcast feed.
 
 import json
 import sys
+import os
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -19,7 +20,14 @@ GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
 def fetch_github_releases():
     """Fetch all releases from GitHub API."""
     try:
-        with urllib.request.urlopen(GITHUB_API_URL) as response:
+        # Use GitHub token if available (for authenticated requests with higher rate limit)
+        github_token = os.environ.get('GITHUB_TOKEN')
+
+        request = urllib.request.Request(GITHUB_API_URL)
+        if github_token:
+            request.add_header('Authorization', f'token {github_token}')
+
+        with urllib.request.urlopen(request) as response:
             return json.loads(response.read().decode())
     except urllib.error.URLError as e:
         print(f"Error fetching releases: {e}", file=sys.stderr)
