@@ -111,7 +111,7 @@ def sign_dmg(dmg_url, private_key):
         print(f"  Signing DMG...", file=sys.stderr)
         result = subprocess.run(
             ['./sign_update', '--ed-key-file', '-', '-p', tmp_path],
-            input=private_key.encode(),
+            input=private_key,
             capture_output=True,
             text=True
         )
