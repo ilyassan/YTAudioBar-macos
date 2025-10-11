@@ -42,7 +42,7 @@ YTAudioBar includes automatic update checking. You'll be notified when new versi
 
 **Full Changelog**: https://github.com/ilyassan/YTAudioBar-macos/compare/v1.1.0...HEAD
 ]]&gt;</description>
-      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.1.0/YTAudioBar-1.1.0.dmg" length="1703398" type="application/octet-stream" sparkle:version="0" sparkle:shortVersionString="1.1.0"/>
+      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.1.0/YTAudioBar-1.1.0.dmg" length="1703398" type="application/octet-stream" sparkle:version="10" sparkle:shortVersionString="1.1.0"/>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
     </item>
     <item>
