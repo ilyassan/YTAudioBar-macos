@@ -28,5 +28,11 @@
 	<string>https://raw.githubusercontent.com/ilyassan/YTAudioBar-macos/main/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>tLphlsNrHLsCqjqpuJUAKRzUKQ2xGKIyBGxBBOeZvLw=</string>
+	<key>SUAutomaticallyUpdate</key>
+	<true/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>

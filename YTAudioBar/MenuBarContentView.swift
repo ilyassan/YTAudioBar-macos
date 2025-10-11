@@ -68,7 +68,7 @@ struct MenuBarContentView: View {
                     }
                     .tag(3)
                 
-                SettingsView(updaterController: updaterController)
+                SettingsView()
                     .tabItem {
                         Image(systemName: "gear")
                         Text("Settings")
@@ -1156,7 +1156,6 @@ struct SettingsView: View {
     @State private var defaultDownloadPath = "~/Downloads/YTAudioBar Downloads"
     @State private var preferredAudioQuality = "best"
     @State private var autoUpdateYTDLP = true
-    var updaterController: SPUStandardUpdaterController?
 
     let audioQualities = ["best", "320", "256", "192", "128"]
 
@@ -1205,14 +1204,6 @@ struct SettingsView: View {
                             .pickerStyle(.menu)
                             .frame(width: 140)
                         }
-                    }
-                }
-
-
-                // App Updates Section
-                if let updater = updaterController?.updater {
-                    SettingsSection(title: "App Updates", icon: "arrow.triangle.2.circlepath") {
-                        AppUpdateSettingsView(updater: updater)
                     }
                 }
 

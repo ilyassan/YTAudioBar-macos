@@ -240,30 +240,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     
     private func showContextMenu() {
         guard let button = statusBarItem.button else { return }
-        
+
         let menu = NSMenu()
 
-        // Check for Updates menu item - Using Sparkle
-        let updateMenuItem = NSMenuItem(title: "Check for Updates...", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
-        updateMenuItem.target = updaterController
-        menu.addItem(updateMenuItem)
-        
-        // Separator
-        menu.addItem(NSMenuItem.separator())
-        
         // About menu item
         let aboutMenuItem = NSMenuItem(title: "About YTAudioBar", action: #selector(showAbout), keyEquivalent: "")
         aboutMenuItem.target = self
         menu.addItem(aboutMenuItem)
-        
+
         // Separator
         menu.addItem(NSMenuItem.separator())
-        
+
         // Quit menu item
         let quitMenuItem = NSMenuItem(title: "Quit YTAudioBar", action: #selector(quitApplication), keyEquivalent: "q")
         quitMenuItem.target = self
         menu.addItem(quitMenuItem)
-        
+
         // Show the menu at the button location
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height), in: button)
     }
