@@ -59,7 +59,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Check dependencies and show setup UI if needed
         checkDependenciesAndSetup()
 
-        // Sparkle will automatically check for updates based on Info.plist settings
+        // Force Sparkle to check for updates on launch (for testing 60-second interval)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.updaterController.updater.checkForUpdatesInBackground()
+            print("🔍 Sparkle: Checking for updates in background...")
+        }
 
         // Create the popover
         popover = NSPopover()
