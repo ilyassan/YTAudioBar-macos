@@ -1,8 +1,13 @@
 import SwiftUI
+import Sparkle
 
 struct AppUpdateSettingsView: View {
-    @StateObject private var appUpdater = AppUpdater.shared
-    
+    @ObservedObject private var updaterViewModel: UpdaterViewModel
+
+    init(updater: SPUUpdater) {
+        self.updaterViewModel = UpdaterViewModel(updater: updater)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -13,67 +18,81 @@ struct AppUpdateSettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 Button(action: {
-                    appUpdater.manualUpdate()
+                    updaterViewModel.checkForUpdates()
                 }) {
                     HStack(spacing: 4) {
-                        if appUpdater.isCheckingForUpdates {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                        }
+                        Image(systemName: "arrow.clockwise")
                         Text("Check for Updates")
                     }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .disabled(appUpdater.isCheckingForUpdates)
+                .disabled(!updaterViewModel.canCheckForUpdates)
             }
-            
-            if appUpdater.updateAvailable {
-                Divider()
-                
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Update Available!")
-                            .font(.subheadline)
-                            .foregroundColor(.green)
-                        Text("Version \(appUpdater.latestVersion)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    Button("Download") {
-                        if let url = URL(string: appUpdater.downloadURL) {
-                            NSWorkspace.shared.open(url)
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                }
-            }
-            
-            if let errorMessage = appUpdater.errorMessage {
-                Divider()
-                
-                HStack {
-                    Image(systemName: "exclamationmark.triangle")
-                        .foregroundColor(.orange)
-                    Text(errorMessage)
+
+            Divider()
+
+            // Automatic update check toggle
+            Toggle("Automatically check for updates", isOn: $updaterViewModel.automaticallyChecksForUpdates)
+                .font(.subheadline)
+
+            // Automatic download toggle
+            Toggle("Automatically download and install updates", isOn: $updaterViewModel.automaticallyDownloadsUpdates)
+                .font(.subheadline)
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 4) {
+                if let lastCheck = updaterViewModel.lastUpdateCheckDate {
+                    Text("Last checked: \(lastCheck.formatted())")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Never checked for updates")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
-            
-            Text("Automatically checks for updates on app launch")
-                .font(.caption)
-                .foregroundColor(.secondary)
         }
+    }
+}
+
+// ViewModel to bridge Sparkle with SwiftUI
+class UpdaterViewModel: ObservableObject {
+    private let updater: SPUUpdater
+    @Published var canCheckForUpdates: Bool = true
+
+    var automaticallyChecksForUpdates: Bool {
+        get { updater.automaticallyChecksForUpdates }
+        set { updater.automaticallyChecksForUpdates = newValue }
+    }
+
+    var automaticallyDownloadsUpdates: Bool {
+        get { updater.automaticallyDownloadsUpdates }
+        set { updater.automaticallyDownloadsUpdates = newValue }
+    }
+
+    var lastUpdateCheckDate: Date? {
+        updater.lastUpdateCheckDate
+    }
+
+    init(updater: SPUUpdater) {
+        self.updater = updater
+
+        // Update canCheckForUpdates from Sparkle periodically
+        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.canCheckForUpdates = self.updater.canCheckForUpdates
+            }
+        }
+    }
+
+    func checkForUpdates() {
+        updater.checkForUpdates()
     }
 }

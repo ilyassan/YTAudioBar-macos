@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CoreData
+import Sparkle
 
 struct MenuBarContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
@@ -16,7 +17,8 @@ struct MenuBarContentView: View {
     @State private var selectedTab = 0
     @State private var isSearching = false
     @State private var isMusicMode = false
-    
+    var updaterController: SPUStandardUpdaterController?
+
     var body: some View {
         VStack(spacing: 0) {
             // Header with search bar
@@ -66,7 +68,7 @@ struct MenuBarContentView: View {
                     }
                     .tag(3)
                 
-                SettingsView()
+                SettingsView(updaterController: updaterController)
                     .tabItem {
                         Image(systemName: "gear")
                         Text("Settings")
@@ -1154,9 +1156,10 @@ struct SettingsView: View {
     @State private var defaultDownloadPath = "~/Downloads/YTAudioBar Downloads"
     @State private var preferredAudioQuality = "best"
     @State private var autoUpdateYTDLP = true
-    
+    var updaterController: SPUStandardUpdaterController?
+
     let audioQualities = ["best", "320", "256", "192", "128"]
-    
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -1204,13 +1207,15 @@ struct SettingsView: View {
                         }
                     }
                 }
-                
-                
+
+
                 // App Updates Section
-                SettingsSection(title: "App Updates", icon: "arrow.triangle.2.circlepath") {
-                    AppUpdateSettingsView()
+                if let updater = updaterController?.updater {
+                    SettingsSection(title: "App Updates", icon: "arrow.triangle.2.circlepath") {
+                        AppUpdateSettingsView(updater: updater)
+                    }
                 }
-                
+
                 // About Section
                 SettingsSection(title: "About", icon: "info.circle") {
                     VStack(alignment: .leading, spacing: 12) {
