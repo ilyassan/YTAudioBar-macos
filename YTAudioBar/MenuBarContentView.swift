@@ -71,7 +71,7 @@ struct MenuBarContentView: View {
                 SettingsView()
                     .tabItem {
                         Image(systemName: "gear")
-                        Text("SettingsX")
+                        Text("Settings")
                     }
                     .tag(4)
             }
