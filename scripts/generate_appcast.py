@@ -57,11 +57,38 @@ def parse_version(tag_name):
 
 
 def parse_build_number(tag_name):
-    """Extract build number from tag name (e.g., 'v1.0.8' -> '8')."""
+    """
+    Extract build number from tag name using semantic versioning.
+    Converts semantic version to a monotonically increasing build number.
+
+    Examples:
+        v1.0.0 -> 100
+        v1.0.9 -> 109
+        v1.1.0 -> 110
+        v2.0.0 -> 200
+
+    This ensures build numbers always increase, even when minor/patch versions reset.
+    """
     version = parse_version(tag_name)
-    # Take the last component as build number (e.g., '1.0.8' -> '8')
     parts = version.split('.')
-    return parts[-1] if parts else version
+
+    if len(parts) >= 3:
+        # Convert X.Y.Z to XYZ (e.g., 1.1.0 -> 110, 1.0.9 -> 109)
+        major = int(parts[0])
+        minor = int(parts[1])
+        patch = int(parts[2])
+        # Build number = major * 100 + minor * 10 + patch
+        build_number = (major * 100) + (minor * 10) + patch
+        return str(build_number)
+    elif len(parts) == 2:
+        # Convert X.Y to XY0 (e.g., 1.1 -> 110)
+        major = int(parts[0])
+        minor = int(parts[1])
+        build_number = (major * 100) + (minor * 10)
+        return str(build_number)
+    else:
+        # Fallback for single component versions
+        return parts[0] if parts else version
 
 
 def sign_dmg(dmg_url, private_key):
