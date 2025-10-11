@@ -127,4 +127,4 @@ dist/
 .idea/
 
 # CI/CD
-.github/workflows/secrets/
+.github/workflows/secrets/sparkle_private_key.txt

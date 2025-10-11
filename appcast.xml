@@ -42,7 +42,7 @@ YTAudioBar includes automatic update checking. You'll be notified when new versi
 
 **Full Changelog**: https://github.com/ilyassan/YTAudioBar-macos/compare/v1.0.8...HEAD
 ]]&gt;</description>
-      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.8/YTAudioBar-1.0.8.dmg" length="1677075" type="application/octet-stream" sparkle:version="1.0.8" sparkle:shortVersionString="1.0.8"/>
+      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.8/YTAudioBar-1.0.8.dmg" length="1677075" type="application/octet-stream" sparkle:version="8" sparkle:shortVersionString="1.0.8"/>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
     </item>
     <item>
@@ -82,7 +82,7 @@ YTAudioBar includes automatic update checking. You'll be notified when new versi
 
 **Full Changelog**: https://github.com/ilyassan/YTAudioBar-macos/compare/v1.0.7...HEAD
 ]]&gt;</description>
-      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.7/YTAudioBar-1.0.7.dmg" length="1676939" type="application/octet-stream" sparkle:version="1.0.7" sparkle:shortVersionString="1.0.7"/>
+      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.7/YTAudioBar-1.0.7.dmg" length="1676939" type="application/octet-stream" sparkle:version="7" sparkle:shortVersionString="1.0.7"/>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
     </item>
     <item>
@@ -122,7 +122,7 @@ YTAudioBar includes automatic update checking. You'll be notified when new versi
 
 **Full Changelog**: https://github.com/ilyassan/YTAudioBar-macos/compare/v1.0.6...HEAD
 ]]&gt;</description>
-      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.6/YTAudioBar-1.0.6.dmg" length="1676142" type="application/octet-stream" sparkle:version="1.0.6" sparkle:shortVersionString="1.0.6"/>
+      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.6/YTAudioBar-1.0.6.dmg" length="1676142" type="application/octet-stream" sparkle:version="6" sparkle:shortVersionString="1.0.6"/>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
     </item>
     <item>
@@ -157,7 +157,7 @@ YTAudioBar includes automatic update checking. You'll be notified when new versi
 ---
 
 **Full Changelog**: https://github.com/ilyassan/YTAudioBar-macos/compare/v1.0.3...v1.0.4]]&gt;</description>
-      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.4/YTAudioBar-1.0.4.dmg" length="1675465" type="application/octet-stream" sparkle:version="1.0.4" sparkle:shortVersionString="1.0.4"/>
+      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.4/YTAudioBar-1.0.4.dmg" length="1675465" type="application/octet-stream" sparkle:version="4" sparkle:shortVersionString="1.0.4"/>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
     </item>
     <item>
@@ -192,7 +192,7 @@ YTAudioBar includes automatic update checking. You'll be notified when new versi
 ---
 
 **Full Changelog**: https://github.com/ilyassan/YTAudioBar-macos/compare/v1.0.2...v1.0.3]]&gt;</description>
-      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.3/YTAudioBar-1.0.3.dmg" length="1675026" type="application/octet-stream" sparkle:version="1.0.3" sparkle:shortVersionString="1.0.3"/>
+      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.3/YTAudioBar-1.0.3.dmg" length="1675026" type="application/octet-stream" sparkle:version="3" sparkle:shortVersionString="1.0.3"/>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
     </item>
     <item>
@@ -209,7 +209,7 @@ YTAudioBar includes automatic update checking. You'll be notified when new versi
 - **Reduced Complexity**: Simplified codebase by removing unused notification system
 
 ### 🐛 Bug Fixes  
-- Fixed inconsistent version display in About section showing static "1.0.0" instead of actual version
+- Fixed inconsistent version display in About section showing static &quot;1.0.0&quot; instead of actual version
 - Corrected version fallback values across all app components for consistency
 
 ### 📦 Technical Changes
@@ -239,7 +239,7 @@ YTAudioBar includes automatic update checking. You'll be notified when new versi
 ---
 
 **Full Changelog**: https://github.com/ilyassan/YTAudioBar-macos/compare/v1.0.1...v1.0.2]]&gt;</description>
-      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.2/YTAudioBar-1.0.2.dmg" length="902170" type="application/octet-stream" sparkle:version="1.0.2" sparkle:shortVersionString="1.0.2"/>
+      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.2/YTAudioBar-1.0.2.dmg" length="902170" type="application/octet-stream" sparkle:version="2" sparkle:shortVersionString="1.0.2"/>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
     </item>
     <item>
@@ -279,7 +279,7 @@ YTAudioBar includes automatic update checking. You'll be notified when new versi
 
 **Full Changelog**: https://github.com/ilyassan/YTAudioBar-macos/compare/v1.0.1...HEAD
 ]]&gt;</description>
-      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.1/YTAudioBar-1.0.1.dmg" length="890349" type="application/octet-stream" sparkle:version="1.0.1" sparkle:shortVersionString="1.0.1"/>
+      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.1/YTAudioBar-1.0.1.dmg" length="890349" type="application/octet-stream" sparkle:version="1" sparkle:shortVersionString="1.0.1"/>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
     </item>
     <item>
@@ -357,7 +357,7 @@ This is the initial release. Future updates will include:
 
 **GitHub**: https://github.com/ilyassan/YTAudioBar-macos
 ]]&gt;</description>
-      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.0/YTAudioBar-1.0.0.dmg" length="1258601" type="application/octet-stream" sparkle:version="1.0.0" sparkle:shortVersionString="1.0.0"/>
+      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.0/YTAudioBar-1.0.0.dmg" length="1258601" type="application/octet-stream" sparkle:version="0" sparkle:shortVersionString="1.0.0"/>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
     </item>
   </channel>

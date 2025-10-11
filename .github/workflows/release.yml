@@ -143,6 +143,7 @@ jobs:
     - name: Generate Sparkle appcast.xml
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
       run: |
         cd scripts
         python3 generate_appcast.py

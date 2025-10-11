@@ -26,7 +26,7 @@
 	<string>NSApplication</string>
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/ilyassan/YTAudioBar-macos/main/appcast.xml</string>
-	<key>SUAllowsInsecureUpdates</key>
-	<true/>
+	<key>SUPublicEDKey</key>
+	<string>tLphlsNrHLsCqjqpuJUAKRzUKQ2xGKIyBGxBBOeZvLw=</string>
 </dict>
 </plist>
