@@ -15,6 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var statusBarItem: NSStatusItem!
     var popover: NSPopover!
     private var audioManager = AudioManager.shared
+    private var mediaKeyManager = MediaKeyManager.shared
     private var cancellables: Set<AnyCancellable> = []
     private let updaterController: SPUStandardUpdaterController
 
@@ -50,7 +51,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         
         // Listen to audio manager state changes
         setupAudioManagerObservers()
-        
+
+        // Setup media key manager for keyboard shortcuts and Control Center
+        setupMediaKeyManager()
+
         // Check dependencies and show setup UI if needed
         checkDependenciesAndSetup()
 
@@ -107,6 +111,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     
     func applicationWillTerminate(_ notification: Notification) {
         // Clean up resources
+        mediaKeyManager.cleanup()
     }
     
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -114,7 +119,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     
     // MARK: - Menu Bar Icon Management
-    
+
+    private func setupMediaKeyManager() {
+        // Initialize media key manager with audio manager
+        mediaKeyManager.setup(with: audioManager)
+        print("🎹 Media key manager setup complete")
+    }
+
     private func setupAudioManagerObservers() {
         // Observe playback state changes
         audioManager.$isPlaying
