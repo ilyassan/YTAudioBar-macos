@@ -19,9 +19,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let updaterController: SPUStandardUpdaterController
 
     override init() {
-        // Initialize Sparkle updater
+        // Initialize Sparkle updater BUT DON'T START IT YET
+        // Starting it in init() causes issues because Info.plist isn't fully loaded yet
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: true,
+            startingUpdater: false,
             updaterDelegate: nil,
             userDriverDelegate: nil
         )
@@ -40,11 +41,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Hide dock icon to make it a proper menu bar app
         NSApp.setActivationPolicy(.accessory)
-        
+
         // Create the status bar item
         statusBar = NSStatusBar.system
         statusBarItem = statusBar.statusItem(withLength: NSStatusItem.squareLength)
-        
+
         // Set the status bar button
         if let statusBarButton = statusBarItem.button {
             updateMenuBarIcon(isPlaying: false)
@@ -52,19 +53,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             statusBarButton.action = #selector(statusBarButtonClicked(_:))
             statusBarButton.target = self
             statusBarButton.toolTip = "YTAudioBar - Left click to open, Right click for options"
-            
+
             // Enable right-click detection
             statusBarButton.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
-        
+
         // Listen to audio manager state changes
         setupAudioManagerObservers()
-        
+
         // Check dependencies and show setup UI if needed
         checkDependenciesAndSetup()
 
-        // Sparkle will automatically check for updates on launch
-        // No need for manual checkForAppUpdates() call
+        // NOW start Sparkle updater after Info.plist is fully loaded
+        // This prevents "update checker failed to start correctly" error
+        Task {
+            // Small delay to ensure everything is initialized
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            updaterController.updater.checkForUpdatesInBackground()
+        }
 
         // Create the popover
         popover = NSPopover()
