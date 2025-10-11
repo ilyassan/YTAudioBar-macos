@@ -18,13 +18,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var mediaKeyManager = MediaKeyManager.shared
     private var cancellables: Set<AnyCancellable> = []
     private let updaterController: SPUStandardUpdaterController
+    private let silentUpdaterDriver = SilentUpdaterDriver()
 
     override init() {
-        // Initialize Sparkle updater with automatic start
+        // Initialize Sparkle updater with silent driver for background updates
         updaterController = SPUStandardUpdaterController(
             startingUpdater: true,
             updaterDelegate: nil,
-            userDriverDelegate: nil
+            userDriverDelegate: silentUpdaterDriver
         )
         super.init()
     }
