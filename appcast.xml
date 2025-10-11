@@ -6,6 +6,46 @@
     <language>en</language>
     <link>https://github.com/ilyassan/YTAudioBar-macos</link>
     <item>
+      <title>Version 1.0.9</title>
+      <pubDate>Sat, 11 Oct 2025 16:38:57 +0000</pubDate>
+      <link>https://github.com/ilyassan/YTAudioBar-macos/releases/tag/v1.0.9</link>
+      <description>&lt;![CDATA[## YTAudioBar 1.0.9
+
+### 🎵 What's New
+
+&lt;!-- Add your release notes here --&gt;
+
+### 📋 System Requirements
+
+- **macOS**: 13.0 (Ventura) or later
+- **Architecture**: Intel and Apple Silicon Macs supported
+- **Dependencies**: Automatically downloaded on first launch
+
+### 📥 Installation
+
+1. Download `YTAudioBar-1.0.9.dmg`
+2. Open the DMG file
+3. Drag YTAudioBar to Applications folder
+4. Launch YTAudioBar from Applications
+5. Allow dependencies to download on first launch
+
+### 🔄 Updating
+
+YTAudioBar includes automatic update checking. You'll be notified when new versions are available.
+
+### 🐛 Known Issues
+
+- First launch may take a moment while dependencies download
+- Some YouTube videos may not be available due to regional restrictions
+
+---
+
+**Full Changelog**: https://github.com/ilyassan/YTAudioBar-macos/compare/v1.0.9...HEAD
+]]&gt;</description>
+      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.0.9/YTAudioBar-1.0.9.dmg" length="1677074" type="application/octet-stream" sparkle:version="9" sparkle:shortVersionString="1.0.9"/>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+    </item>
+    <item>
       <title>Version 1.0.8</title>
       <pubDate>Sat, 11 Oct 2025 13:27:41 +0000</pubDate>
       <link>https://github.com/ilyassan/YTAudioBar-macos/releases/tag/v1.0.8</link>
@@ -209,7 +249,7 @@ YTAudioBar includes automatic update checking. You'll be notified when new versi
 - **Reduced Complexity**: Simplified codebase by removing unused notification system
 
 ### 🐛 Bug Fixes  
-- Fixed inconsistent version display in About section showing static &quot;1.0.0&quot; instead of actual version
+- Fixed inconsistent version display in About section showing static "1.0.0" instead of actual version
 - Corrected version fallback values across all app components for consistency
 
 ### 📦 Technical Changes
