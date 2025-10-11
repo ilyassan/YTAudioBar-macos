@@ -35,6 +35,8 @@
 	<key>SUEnableSystemProfiling</key>
 	<false/>
 	<key>SUPublicEDKey</key>
-	<string></string>
+	<string>PLACEHOLDER_FOR_FUTURE_SIGNING</string>
+	<key>SUAllowsInsecureUpdates</key>
+	<true/>
 </dict>
 </plist>
