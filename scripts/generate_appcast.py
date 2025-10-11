@@ -110,7 +110,7 @@ def sign_dmg(dmg_url, private_key):
         # Sign the DMG using sign_update tool
         print(f"  Signing DMG...", file=sys.stderr)
         result = subprocess.run(
-            ['./sign_update', tmp_path],
+            ['./sign_update', '--ed-key-file', '-', '-p', tmp_path],
             input=private_key.encode(),
             capture_output=True,
             text=True
@@ -120,10 +120,9 @@ def sign_dmg(dmg_url, private_key):
         os.unlink(tmp_path)
 
         if result.returncode == 0:
-            # Extract signature from output (format: "sparkle:edSignature="SIGNATURE")
-            output = result.stdout.strip()
-            if 'sparkle:edSignature=' in output:
-                signature = output.split('sparkle:edSignature="')[1].split('"')[0]
+            # Extract signature from output (with -p flag, it just prints the signature)
+            signature = result.stdout.strip()
+            if signature:
                 return signature
         else:
             print(f"  Warning: Failed to sign DMG: {result.stderr}", file=sys.stderr)

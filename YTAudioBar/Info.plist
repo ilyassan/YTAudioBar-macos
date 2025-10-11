@@ -26,6 +26,8 @@
 	<string>NSApplication</string>
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/ilyassan/YTAudioBar-macos/main/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>tLphlsNrHLsCqjqpuJUAKRzUKQ2xGKIyBGxBBOeZvLw=</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUScheduledCheckInterval</key>
