@@ -132,7 +132,7 @@ jobs:
           YTAudioBar-${{ steps.get_version.outputs.version }}.dmg
         name: YTAudioBar ${{ steps.get_version.outputs.version }}
         body_path: release_notes.md
-        draft: true
+        draft: false
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

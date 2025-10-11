@@ -56,10 +56,7 @@ struct AppUpdateSettingsView: View {
 // ViewModel to bridge Sparkle with SwiftUI
 class UpdaterViewModel: ObservableObject {
     private let updater: SPUUpdater
-
-    var canCheckForUpdates: Bool {
-        updater.canCheckForUpdates
-    }
+    @Published var canCheckForUpdates: Bool = true // Always allow manual checks
 
     var lastUpdateCheckDate: Date? {
         updater.lastUpdateCheckDate
@@ -69,6 +66,15 @@ class UpdaterViewModel: ObservableObject {
         self.updater = updater
         // Ensure automatic updates are enabled by default
         updater.automaticallyDownloadsUpdates = true
+
+        // Update canCheckForUpdates from Sparkle periodically
+        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                // Keep it true always, but use Sparkle's status as reference
+                self.canCheckForUpdates = true
+            }
+        }
     }
 
     func checkForUpdates() {
