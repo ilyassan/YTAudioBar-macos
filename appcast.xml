@@ -6,10 +6,10 @@
     <language>en</language>
     <link>https://github.com/ilyassan/YTAudioBar-macos</link>
     <item>
-      <title>Version 1.1.1</title>
-      <pubDate>Sun, 26 Oct 2025 17:36:29 +0000</pubDate>
-      <link>https://github.com/ilyassan/YTAudioBar-macos/releases/tag/v1.1.1</link>
-      <description>&lt;![CDATA[## YTAudioBar 1.1.1
+      <title>Version 1.1.2</title>
+      <pubDate>Sun, 26 Oct 2025 18:02:14 +0000</pubDate>
+      <link>https://github.com/ilyassan/YTAudioBar-macos/releases/tag/v1.1.2</link>
+      <description>&lt;![CDATA[## YTAudioBar 1.1.2
 
 ### 🎵 What's New
 
@@ -23,7 +23,7 @@
 
 ### 📥 Installation
 
-1. Download `YTAudioBar-1.1.1.dmg`
+1. Download `YTAudioBar-1.1.2.dmg`
 2. Open the DMG file
 3. Drag YTAudioBar to Applications folder
 4. Launch YTAudioBar from Applications
@@ -40,7 +40,42 @@ YTAudioBar includes automatic update checking. You'll be notified when new versi
 
 ---
 
-**Full Changelog**: https://github.com/ilyassan/YTAudioBar-macos/compare/v1.1.1...HEAD
+**Full Changelog**: https://github.com/ilyassan/YTAudioBar-macos/compare/v1.1.2...HEAD
+]]&gt;</description>
+      <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.1.2/YTAudioBar-1.1.2.dmg" length="1728935" type="application/octet-stream" sparkle:version="112" sparkle:shortVersionString="1.1.2" sparkle:edSignature="u+rMjO4LiHwWoGv0Yo1FSNU9Q3zGRA7NmPyjgc8P5VTISvpI9GK+aHQWrWS4odTQnbALonDrlpS+KtFvjBzhBg=="/>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+    </item>
+    <item>
+      <title>Version 1.1.1</title>
+      <pubDate>Sun, 26 Oct 2025 17:36:29 +0000</pubDate>
+      <link>https://github.com/ilyassan/YTAudioBar-macos/releases/tag/v1.1.1</link>
+      <description>&lt;![CDATA[## YTAudioBar 1.1.1
+
+### 🎵 What's New
+
+&lt;!-- Add your release notes here --&gt;
+
+### 📋 System Requirements
+
+- **macOS**: 14.0 (Ventura) or later
+- **Architecture**: Intel and Apple Silicon Macs supported
+- **Dependencies**: Automatically downloaded on first launch
+
+### 📥 Installation
+
+1. Download `YTAudioBar-1.1.1.dmg`
+2. Open the DMG file
+3. Drag YTAudioBar to Applications folder
+4. Launch YTAudioBar from Applications
+5. Allow dependencies to download on first launch
+
+### 🔄 Updating
+
+Change the app icon to match the macos apps standards.
+
+### 🐛 Known Issues
+
+- The play track functionality still does not stream the track in real-time
 ]]&gt;</description>
       <enclosure url="https://github.com/ilyassan/YTAudioBar-macos/releases/download/v1.1.1/YTAudioBar-1.1.1.dmg" length="1712003" type="application/octet-stream" sparkle:version="111" sparkle:shortVersionString="1.1.1" sparkle:edSignature="UFvRDS+sEz2LkffpywmzVjIw5bwbjjyv83TB1d/k0b4RMNF4L4y7migE91hj/uUWHFgb6hieBkDZ3kqT69PXDg=="/>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
