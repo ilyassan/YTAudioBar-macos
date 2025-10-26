@@ -108,6 +108,9 @@ download_ffmpeg.sh
 generate_icons.swift
 *.sh
 
+# Icon backups
+**/AppIcon.appiconset/backup_original/
+
 # Release artifacts
 *.app
 *.dmg
